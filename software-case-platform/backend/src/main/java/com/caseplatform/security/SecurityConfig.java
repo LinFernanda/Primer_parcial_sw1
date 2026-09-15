@@ -81,9 +81,17 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/users/**").hasAnyRole("ADMIN", "INGENIERO")
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
 
-                        // Rutas protegidas futuras (Proyectos, Modelos)
-                        .requestMatchers("/api/projects/**").authenticated()
-                        .requestMatchers("/api/models/**").authenticated()
+                        // Rutas protegidas del Núcleo UML 2.5
+                        .requestMatchers(
+                                "/api/proyectos/**",
+                                "/api/modelos/**",
+                                "/api/clases/**",
+                                "/api/relaciones/**",
+                                "/api/atributos/**",
+                                "/api/metodos/**",
+                                "/api/projects/**",
+                                "/api/models/**"
+                        ).authenticated()
 
                         // Cualquier otra petición debe estar autenticada
                         .anyRequest().authenticated()

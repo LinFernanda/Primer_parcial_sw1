@@ -29,6 +29,9 @@ class SecurityIntegrationTest {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private com.caseplatform.repository.ProyectoUMLRepository proyectoUMLRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -41,6 +44,7 @@ class SecurityIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        proyectoUMLRepository.deleteAll();
         usuarioRepository.deleteAll();
 
         adminUser = usuarioRepository.save(Usuario.builder()
@@ -70,7 +74,7 @@ class SecurityIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
 
-        mockMvc.perform(get("/api/projects"))
+        mockMvc.perform(get("/api/proyectos"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
     }
@@ -86,12 +90,11 @@ class SecurityIntegrationTest {
     }
 
     @Test
-    @DisplayName("Seguridad: Acceso exitoso a /api/projects con token JWT válido (HTTP 200)")
+    @DisplayName("Seguridad: Acceso exitoso a /api/proyectos con token JWT válido (HTTP 200)")
     void testAccesoProyectosConTokenValido_Devuelve200() throws Exception {
-        mockMvc.perform(get("/api/projects")
+        mockMvc.perform(get("/api/proyectos")
                         .header("Authorization", "Bearer " + ingenieroToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.usuario").value("dev.test@caseplatform.com"));
+                .andExpect(status().isOk());
     }
 
     @Test
