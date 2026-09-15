@@ -13,13 +13,17 @@ import {
 } from 'reactflow';
 import {
   AtributoUML,
+  BloqueoElemento,
   ClaseUML,
   MetodoUML,
   ModeloUML,
   RelacionUML,
+  UMLEvent,
+  UsuarioConectado,
   VisibilidadUML,
 } from '../models/uml.types';
 import { umlService } from '../services/umlService';
+import { websocketService } from '../services/websocketService';
 
 interface HistorySnapshot {
   nodes: Node[];
@@ -38,6 +42,18 @@ interface UMLStoreState {
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
+
+  // Estado colaborativo en tiempo real
+  connectedUsers: UsuarioConectado[];
+  lockedElements: BloqueoElemento[];
+  isWsConnected: boolean;
+
+  // Acciones colaborativas
+  setWsConnected: (connected: boolean) => void;
+  setConnectedUsers: (usuarios: UsuarioConectado[]) => void;
+  setLockedElements: (bloqueos: BloqueoElemento[]) => void;
+  applyRemoteEvent: (event: UMLEvent) => void;
+  broadcastNodePosition: (claseId: number, x: number, y: number) => void;
 
   // Acciones
   loadModelo: (modeloId: number) => Promise<void>;
@@ -79,6 +95,96 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
   isLoading: false,
   isSaving: false,
   error: null,
+
+  // Estado colaborativo
+  connectedUsers: [],
+  lockedElements: [],
+  isWsConnected: false,
+
+  setWsConnected: (connected: boolean) => set({ isWsConnected: connected }),
+  setConnectedUsers: (usuarios: UsuarioConectado[]) => set({ connectedUsers: usuarios }),
+  setLockedElements: (bloqueos: BloqueoElemento[]) => set({ lockedElements: bloqueos }),
+
+  broadcastNodePosition: (claseId: number, x: number, y: number) => {
+    const { modelo } = get();
+    if (!modelo) return;
+    const userEmail = localStorage.getItem('userEmail') || 'ingeniero@caseplatform.com';
+    websocketService.sendEvent(modelo.id, {
+      usuario: userEmail,
+      tipoOperacion: 'UPDATE',
+      elementoTipo: 'CLASE',
+      elementoId: claseId.toString(),
+      datosCambio: {
+        clase: { id: claseId, posicionX: x, posicionY: y },
+      },
+    });
+  },
+
+  applyRemoteEvent: (event: UMLEvent) => {
+    const { modelo } = get();
+    if (!modelo || modelo.id !== event.modeloUMLId) return;
+
+    const currentUser = localStorage.getItem('userEmail');
+    if (event.usuario === currentUser) return; // Evitar duplicar modificaciones ya reflejadas localmente
+
+    if (event.tipoOperacion === 'CREATE' && event.elementoTipo === 'CLASE' && event.datosCambio?.clase) {
+      const incomingClase: ClaseUML = event.datosCambio.clase;
+      if (!modelo.clases.some((c) => c.id === incomingClase.id)) {
+        const updatedClases = [...modelo.clases, incomingClase];
+        const updatedModelo = { ...modelo, clases: updatedClases };
+        const graph = mapModeloToGraph(updatedModelo);
+        set({ modelo: updatedModelo, nodes: graph.nodes, edges: graph.edges });
+      }
+    } else if (event.tipoOperacion === 'UPDATE' && event.elementoTipo === 'CLASE' && event.datosCambio?.clase) {
+      const updatedClase: Partial<ClaseUML> = event.datosCambio.clase;
+      const updatedClases = modelo.clases.map((c) =>
+        c.id === updatedClase.id ? { ...c, ...updatedClase } : c
+      );
+      const updatedModelo = { ...modelo, clases: updatedClases };
+      const graph = mapModeloToGraph(updatedModelo);
+      set({ modelo: updatedModelo, nodes: graph.nodes, edges: graph.edges });
+    } else if (event.tipoOperacion === 'DELETE' && event.elementoTipo === 'CLASE' && event.elementoId) {
+      const targetId = parseInt(event.elementoId, 10);
+      const updatedClases = modelo.clases.filter((c) => c.id !== targetId);
+      const updatedRelaciones = modelo.relaciones.filter(
+        (r) => r.claseOrigenId !== targetId && r.claseDestinoId !== targetId
+      );
+      const updatedModelo = { ...modelo, clases: updatedClases, relaciones: updatedRelaciones };
+      const graph = mapModeloToGraph(updatedModelo);
+      set({ modelo: updatedModelo, nodes: graph.nodes, edges: graph.edges });
+    } else if (event.tipoOperacion === 'CREATE' && event.elementoTipo === 'RELACION' && event.datosCambio?.relacion) {
+      const incomingRelacion: RelacionUML = event.datosCambio.relacion;
+      if (!modelo.relaciones.some((r) => r.id === incomingRelacion.id)) {
+        const updatedRelaciones = [...modelo.relaciones, incomingRelacion];
+        const updatedModelo = { ...modelo, relaciones: updatedRelaciones };
+        const graph = mapModeloToGraph(updatedModelo);
+        set({ modelo: updatedModelo, nodes: graph.nodes, edges: graph.edges });
+      }
+    } else if (event.tipoOperacion === 'DELETE' && event.elementoTipo === 'RELACION' && event.elementoId) {
+      const targetId = parseInt(event.elementoId, 10);
+      const updatedRelaciones = modelo.relaciones.filter((r) => r.id !== targetId);
+      const updatedModelo = { ...modelo, relaciones: updatedRelaciones };
+      const graph = mapModeloToGraph(updatedModelo);
+      set({ modelo: updatedModelo, nodes: graph.nodes, edges: graph.edges });
+    } else if (event.tipoOperacion === 'LOCK' && event.elementoId && event.usuario) {
+      const newLock: BloqueoElemento = {
+        elementoId: event.elementoId,
+        usuario: event.usuario,
+        elementoTipo: (event.elementoTipo as string) || 'CLASE',
+        fechaBloqueo: event.fecha,
+      };
+      set((state) => ({
+        lockedElements: [
+          ...state.lockedElements.filter((l) => l.elementoId !== event.elementoId),
+          newLock,
+        ],
+      }));
+    } else if (event.tipoOperacion === 'UNLOCK' && event.elementoId) {
+      set((state) => ({
+        lockedElements: state.lockedElements.filter((l) => l.elementoId !== event.elementoId),
+      }));
+    }
+  },
 
   loadModelo: async (modeloId: number) => {
     set({ isLoading: true, error: null });
@@ -133,6 +239,15 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
   },
 
   selectClass: (id: number | null) => {
+    const { modelo, selectedClassId } = get();
+    if (modelo) {
+      if (selectedClassId && selectedClassId !== id) {
+        websocketService.unlockElement(modelo.id, selectedClassId.toString());
+      }
+      if (id !== null) {
+        websocketService.lockElement(modelo.id, id.toString(), 'CLASE');
+      }
+    }
     set({
       selectedClassId: id,
       selectedRelationId: null,
@@ -140,6 +255,10 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
   },
 
   selectRelation: (id: number | null) => {
+    const { modelo, selectedClassId } = get();
+    if (modelo && selectedClassId) {
+      websocketService.unlockElement(modelo.id, selectedClassId.toString());
+    }
     set({
       selectedRelationId: id,
       selectedClassId: null,
@@ -173,6 +292,14 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
       const updatedModelo = { ...modelo, clases: updatedClases };
       const graph = mapModeloToGraph(updatedModelo);
 
+      // Difundir evento de creación colaborativa en tiempo real
+      websocketService.sendEvent(modelo.id, {
+        tipoOperacion: 'CREATE',
+        elementoTipo: 'CLASE',
+        elementoId: nuevaClase.id!.toString(),
+        datosCambio: { clase: nuevaClase },
+      });
+
       set({
         modelo: updatedModelo,
         nodes: graph.nodes,
@@ -202,6 +329,14 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
       );
       const updatedModelo = { ...modelo, clases: updatedClases };
       const graph = mapModeloToGraph(updatedModelo);
+
+      // Difundir actualización en tiempo real
+      websocketService.sendEvent(modelo.id, {
+        tipoOperacion: 'UPDATE',
+        elementoTipo: 'CLASE',
+        elementoId: id.toString(),
+        datosCambio: { clase: claseActualizada },
+      });
 
       set({
         modelo: updatedModelo,
@@ -236,6 +371,13 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
         relaciones: updatedRelaciones,
       };
       const graph = mapModeloToGraph(updatedModelo);
+
+      // Difundir eliminación en tiempo real
+      websocketService.sendEvent(modelo.id, {
+        tipoOperacion: 'DELETE',
+        elementoTipo: 'CLASE',
+        elementoId: id.toString(),
+      });
 
       set({
         modelo: updatedModelo,
@@ -396,6 +538,14 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
       const updatedModelo = { ...modelo, relaciones: updatedRelaciones };
       const graph = mapModeloToGraph(updatedModelo);
 
+      // Difundir creación de relación en tiempo real
+      websocketService.sendEvent(modelo.id, {
+        tipoOperacion: 'CREATE',
+        elementoTipo: 'RELACION',
+        elementoId: nuevaRelacion.id!.toString(),
+        datosCambio: { relacion: nuevaRelacion },
+      });
+
       set({
         modelo: updatedModelo,
         nodes: graph.nodes,
@@ -425,6 +575,13 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
       const updatedRelaciones = modelo.relaciones.filter((r) => r.id !== id);
       const updatedModelo = { ...modelo, relaciones: updatedRelaciones };
       const graph = mapModeloToGraph(updatedModelo);
+
+      // Difundir eliminación de relación en tiempo real
+      websocketService.sendEvent(modelo.id, {
+        tipoOperacion: 'DELETE',
+        elementoTipo: 'RELACION',
+        elementoId: id.toString(),
+      });
 
       set({
         modelo: updatedModelo,

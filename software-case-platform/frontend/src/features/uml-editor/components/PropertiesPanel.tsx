@@ -20,6 +20,7 @@ export const PropertiesPanel: React.FC = () => {
     addMethod,
     deleteMethod,
     deleteRelation,
+    lockedElements,
   } = useUMLStore();
 
   // Estados para nuevo atributo
@@ -111,9 +112,16 @@ export const PropertiesPanel: React.FC = () => {
   const clase = modelo?.clases.find((c) => c.id === selectedClassId);
   if (!clase) return null;
 
+  const currentUser =
+    typeof window !== 'undefined' && window.localStorage
+      ? window.localStorage.getItem('userEmail') || ''
+      : '';
+  const classLock = lockedElements.find((l) => l.elementoId === selectedClassId?.toString());
+  const isLockedByOther = !!classLock && classLock.usuario !== currentUser;
+
   const handleAddAttribute = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!attrNombre.trim()) return;
+    if (!attrNombre.trim() || isLockedByOther) return;
     await addAttribute(clase.id!, {
       nombre: attrNombre.trim(),
       tipoDato: attrTipo,
@@ -124,7 +132,7 @@ export const PropertiesPanel: React.FC = () => {
 
   const handleAddMethod = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!metNombre.trim()) return;
+    if (!metNombre.trim() || isLockedByOther) return;
     await addMethod(clase.id!, {
       nombre: metNombre.trim(),
       tipoRetorno: metTipo,
@@ -145,6 +153,25 @@ export const PropertiesPanel: React.FC = () => {
       </div>
 
       <div className="uml-properties-body">
+        {/* Aviso de Conflicto de Concurrencia */}
+        {isLockedByOther && (
+          <div
+            style={{
+              padding: '8px 10px',
+              marginBottom: '14px',
+              borderRadius: '6px',
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid #ef4444',
+              color: '#fca5a5',
+              fontSize: '12px',
+              lineHeight: '1.4',
+            }}
+          >
+            🔒 <strong>Elemento bloqueado:</strong> Modificado por{' '}
+            <strong>{classLock.usuario}</strong>. Edición deshabilitada temporalmente para evitar inconsistencias.
+          </div>
+        )}
+
         {/* Nombre de Clase */}
         <div className="uml-field-group">
           <label className="uml-field-label">Nombre</label>
@@ -152,6 +179,7 @@ export const PropertiesPanel: React.FC = () => {
             type="text"
             className="uml-field-input"
             value={clase.nombre}
+            disabled={isLockedByOther}
             onChange={(e) => updateClass(clase.id!, { nombre: e.target.value })}
           />
         </div>
@@ -162,6 +190,7 @@ export const PropertiesPanel: React.FC = () => {
           <select
             className="uml-field-select"
             value={clase.visibilidad}
+            disabled={isLockedByOther}
             onChange={(e) =>
               updateClass(clase.id!, { visibilidad: e.target.value as VisibilidadUML })
             }
@@ -195,6 +224,7 @@ export const PropertiesPanel: React.FC = () => {
                 <button
                   className="uml-del-btn"
                   onClick={() => deleteAttribute(attr.id!)}
+                  disabled={isLockedByOther}
                   title="Eliminar atributo"
                 >
                   <Trash2 size={12} />
@@ -210,6 +240,7 @@ export const PropertiesPanel: React.FC = () => {
               className="uml-field-select"
               style={{ width: '45px', padding: '4px 2px', textAlign: 'center' }}
               value={attrVis}
+              disabled={isLockedByOther}
               onChange={(e) => setAttrVis(e.target.value as VisibilidadUML)}
               title="Visibilidad"
             >
@@ -224,12 +255,14 @@ export const PropertiesPanel: React.FC = () => {
               className="uml-field-input"
               style={{ flex: 1, padding: '4px 8px' }}
               value={attrNombre}
+              disabled={isLockedByOther}
               onChange={(e) => setAttrNombre(e.target.value)}
             />
             <select
               className="uml-field-select"
               style={{ width: '90px', padding: '4px 6px' }}
               value={attrTipo}
+              disabled={isLockedByOther}
               onChange={(e) => setAttrTipo(e.target.value)}
             >
               {TIPOS_DATO_DISPONIBLES.map((t) => (
@@ -239,7 +272,7 @@ export const PropertiesPanel: React.FC = () => {
               ))}
             </select>
           </div>
-          <button type="submit" className="uml-small-btn" style={{ alignSelf: 'flex-start' }}>
+          <button type="submit" className="uml-small-btn" disabled={isLockedByOther} style={{ alignSelf: 'flex-start' }}>
             <Plus size={12} /> Agregar Atributo
           </button>
         </form>
@@ -262,6 +295,7 @@ export const PropertiesPanel: React.FC = () => {
                 <button
                   className="uml-del-btn"
                   onClick={() => deleteMethod(met.id!)}
+                  disabled={isLockedByOther}
                   title="Eliminar método"
                 >
                   <Trash2 size={12} />
@@ -277,6 +311,7 @@ export const PropertiesPanel: React.FC = () => {
               className="uml-field-select"
               style={{ width: '45px', padding: '4px 2px', textAlign: 'center' }}
               value={metVis}
+              disabled={isLockedByOther}
               onChange={(e) => setMetVis(e.target.value as VisibilidadUML)}
               title="Visibilidad"
             >
@@ -291,12 +326,14 @@ export const PropertiesPanel: React.FC = () => {
               className="uml-field-input"
               style={{ flex: 1, padding: '4px 8px' }}
               value={metNombre}
+              disabled={isLockedByOther}
               onChange={(e) => setMetNombre(e.target.value)}
             />
             <select
               className="uml-field-select"
               style={{ width: '80px', padding: '4px 6px' }}
               value={metTipo}
+              disabled={isLockedByOther}
               onChange={(e) => setMetTipo(e.target.value)}
             >
               <option value="void">void</option>
@@ -307,7 +344,7 @@ export const PropertiesPanel: React.FC = () => {
               <option value="Object">Object</option>
             </select>
           </div>
-          <button type="submit" className="uml-small-btn" style={{ alignSelf: 'flex-start' }}>
+          <button type="submit" className="uml-small-btn" disabled={isLockedByOther} style={{ alignSelf: 'flex-start' }}>
             <Plus size={12} /> Agregar Método
           </button>
         </form>
@@ -316,6 +353,7 @@ export const PropertiesPanel: React.FC = () => {
         <button
           className="uml-toolbar-btn danger"
           style={{ marginTop: '20px', justifyContent: 'center' }}
+          disabled={isLockedByOther}
           onClick={() => deleteClass(clase.id!)}
         >
           <Trash2 size={14} /> Eliminar Clase

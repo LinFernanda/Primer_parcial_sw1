@@ -25,6 +25,7 @@ export const UMLCanvas: React.FC = () => {
     selectClass,
     selectRelation,
     savePositionChanges,
+    broadcastNodePosition,
   } = useUMLStore();
 
   const handleNodeClick = (_: React.MouseEvent, node: Node) => {
@@ -41,9 +42,11 @@ export const UMLCanvas: React.FC = () => {
     selectRelation(null);
   };
 
-  const handleNodeDragStop = () => {
-    // Auto-guarda cambios de posición
+  const handleNodeDragStop = (_: React.MouseEvent, node: Node) => {
+    // Auto-guarda cambios de posición y difunde a los demás colaboradores
     savePositionChanges();
+    const claseId = parseInt(node.id, 10);
+    broadcastNodePosition(claseId, node.position.x, node.position.y);
   };
 
   return (

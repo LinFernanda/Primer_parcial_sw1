@@ -90,3 +90,50 @@ export interface ProyectoUML {
   estado: string;
   modelos: ModeloUML[];
 }
+
+export type TipoOperacionUML =
+  | 'CREATE'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'LOCK'
+  | 'UNLOCK'
+  | 'JOIN'
+  | 'LEAVE'
+  | 'PRESENCE_SYNC'
+  | 'LOCKS_SYNC'
+  | 'ERROR';
+
+export type TipoElementoUML =
+  | 'CLASE'
+  | 'ATRIBUTO'
+  | 'METODO'
+  | 'RELACION'
+  | 'MODELO'
+  | 'PRESENCIA';
+
+export interface UsuarioConectado {
+  usuario: string;
+  nombre: string;
+  color: string;
+  elementoEditando?: string | null;
+  conectadoDesde?: string;
+}
+
+export interface BloqueoElemento {
+  elementoId: string;
+  usuario: string;
+  elementoTipo: string;
+  fechaBloqueo?: string;
+}
+
+export interface UMLEvent {
+  idEvento?: string;
+  usuario?: string;
+  modeloUMLId: number;
+  tipoOperacion: TipoOperacionUML;
+  elementoTipo: TipoElementoUML;
+  elementoId?: string;
+  fecha?: string;
+  datosCambio?: Record<string, any>;
+}
+

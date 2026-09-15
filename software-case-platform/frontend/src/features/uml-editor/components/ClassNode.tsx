@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { ClaseUML, VISIBILIDAD_SIMBOLOS } from '../models/uml.types';
+import { useUMLStore } from '../store/umlStore';
 
 interface ClassNodeData {
   clase: ClaseUML;
@@ -8,9 +9,22 @@ interface ClassNodeData {
 
 export const ClassNode: React.FC<NodeProps<ClassNodeData>> = memo(({ data, selected }) => {
   const { clase } = data;
+  const lockedElements = useUMLStore((s) => s.lockedElements);
+  const currentUser =
+    typeof window !== 'undefined' && window.localStorage
+      ? window.localStorage.getItem('userEmail') || ''
+      : '';
+
+  const lock = lockedElements.find((l) => l.elementoId === clase.id?.toString());
+  const isLockedByOther = lock && lock.usuario !== currentUser;
+  const isLockedBySelf = lock && lock.usuario === currentUser;
 
   return (
-    <div className={`uml-class-node ${selected ? 'selected' : ''}`}>
+    <div
+      className={`uml-class-node ${selected ? 'selected' : ''} ${
+        isLockedByOther ? 'locked-by-other' : isLockedBySelf ? 'locked-by-self' : ''
+      }`}
+    >
       {/* Handles para conexiones React Flow en los 4 extremos */}
       <Handle type="target" position={Position.Top} id="t" style={{ background: '#3b82f6' }} />
       <Handle type="source" position={Position.Top} id="ts" style={{ background: '#3b82f6' }} />
@@ -20,7 +34,24 @@ export const ClassNode: React.FC<NodeProps<ClassNodeData>> = memo(({ data, selec
 
       {/* Cabecera de la Clase */}
       <div className="uml-class-header">
-        <div className="uml-class-stereotype">&laquo;class&raquo;</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <span className="uml-class-stereotype">&laquo;class&raquo;</span>
+          {lock && (
+            <span
+              style={{
+                fontSize: '10px',
+                padding: '1px 5px',
+                borderRadius: '4px',
+                backgroundColor: isLockedByOther ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                color: isLockedByOther ? '#f87171' : '#60a5fa',
+                border: `1px solid ${isLockedByOther ? '#ef4444' : '#3b82f6'}`,
+              }}
+              title={isLockedByOther ? `Bloqueado por ${lock.usuario}` : 'Editando actualmente'}
+            >
+              {isLockedByOther ? `🔒 ${lock.usuario.split('@')[0]}` : '✏️ Editando'}
+            </span>
+          )}
+        </div>
         <div className="uml-class-title">{clase.nombre}</div>
       </div>
 

@@ -73,6 +73,7 @@ public class SecurityConfig {
                                 "/api/v1/health",
                                 "/api/v1/ping",
                                 "/api/v1/info",
+                                "/ws/**",
                                 "/error"
                         ).permitAll()
 

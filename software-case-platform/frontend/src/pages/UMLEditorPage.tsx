@@ -13,6 +13,7 @@ import {
   VisibilidadUML,
   ProyectoUML,
 } from '../features/uml-editor/models/uml.types';
+import { websocketService } from '../features/uml-editor/services/websocketService';
 import '../features/uml-editor/styles/uml-editor.css';
 import { ArrowLeft, Layers } from 'lucide-react';
 
@@ -35,6 +36,10 @@ export const UMLEditorPage: React.FC = () => {
     redo,
     error,
     clearError,
+    applyRemoteEvent,
+    setConnectedUsers,
+    setLockedElements,
+    setWsConnected,
   } = useUMLStore();
 
   // Cargar proyecto y su modelo inicial
@@ -57,6 +62,28 @@ export const UMLEditorPage: React.FC = () => {
 
     fetchProyecto();
   }, [proyectoId, loadModelo]);
+
+  // Conexión y sincronización colaborativa en tiempo real por WebSocket
+  useEffect(() => {
+    if (!selectedModeloId) return;
+
+    const userEmail = localStorage.getItem('userEmail') || 'ingeniero@caseplatform.com';
+    const userName = localStorage.getItem('userName') || userEmail.split('@')[0];
+
+    websocketService.connect(
+      selectedModeloId,
+      userEmail,
+      userName,
+      (event) => applyRemoteEvent(event),
+      (usuarios) => setConnectedUsers(usuarios),
+      (bloqueos) => setLockedElements(bloqueos),
+      (status) => setWsConnected(status)
+    );
+
+    return () => {
+      websocketService.disconnect();
+    };
+  }, [selectedModeloId, applyRemoteEvent, setConnectedUsers, setLockedElements, setWsConnected]);
 
   // Manejo de atajos de teclado (Ctrl+Z, Ctrl+Y, Delete)
   useEffect(() => {
