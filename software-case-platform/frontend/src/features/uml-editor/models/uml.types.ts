@@ -57,13 +57,17 @@ export interface ClaseUML {
 
 export interface RelacionUML {
   id?: number;
-  tipoRelacion: TipoRelacionUML;
+  tipoRelacion?: TipoRelacionUML;
+  tipo?: TipoRelacionUML | string;
+  nombre?: string;
   claseOrigenId: number;
   claseOrigenNombre?: string;
   claseDestinoId: number;
   claseDestinoNombre?: string;
-  cardinalidadOrigen: string;
-  cardinalidadDestino: string;
+  cardinalidadOrigen?: string;
+  cardinalidadDestino?: string;
+  multiplicidadOrigen?: string;
+  multiplicidadDestino?: string;
   descripcion?: string;
   modeloId?: number;
 }

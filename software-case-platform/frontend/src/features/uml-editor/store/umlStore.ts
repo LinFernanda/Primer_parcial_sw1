@@ -79,6 +79,7 @@ interface UMLStoreState {
   deleteRelation: (id: number) => Promise<void>;
   deleteSelected: () => Promise<void>;
   savePositionChanges: () => Promise<void>;
+  restoreModeloState: (modelo: ModeloUML) => void;
   undo: () => void;
   redo: () => void;
   clearError: () => void;
@@ -630,6 +631,21 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
     } catch (err) {
       set({ isSaving: false });
     }
+  },
+
+  restoreModeloState: (restoredModelo: ModeloUML) => {
+    const { nodes, edges, modelo, history } = get();
+    const newHistory = modelo ? [...history, { nodes, edges, modelo }] : history;
+    const graph = mapModeloToGraph(restoredModelo);
+    set({
+      modelo: restoredModelo,
+      nodes: graph.nodes,
+      edges: graph.edges,
+      selectedClassId: null,
+      selectedRelationId: null,
+      history: newHistory,
+      future: [],
+    });
   },
 
   undo: () => {

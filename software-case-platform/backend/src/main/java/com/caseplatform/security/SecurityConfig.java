@@ -90,6 +90,7 @@ public class SecurityConfig {
                                 "/api/relaciones/**",
                                 "/api/atributos/**",
                                 "/api/metodos/**",
+                                "/api/versiones/**",
                                 "/api/projects/**",
                                 "/api/models/**"
                         ).authenticated()

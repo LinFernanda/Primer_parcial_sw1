@@ -49,7 +49,7 @@ INSERT INTO usuarios (nombre_completo, email, password, rol, estado, fecha_creac
 VALUES (
     'Administrador Plataforma CASE',
     'admin@caseplatform.com',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOhiMv4vK1Vd06N76Fz02o4MhyJzom3f2',
+    '$2a$10$oVIGQ8JvNqcpGFFYquFlT./5QTk29TbcqsxY8RJqqBEr0ancx5IKO',
     'ADMIN',
     'ACTIVO',
     CURRENT_TIMESTAMP,
@@ -157,3 +157,82 @@ CREATE TABLE IF NOT EXISTS relaciones_uml (
 CREATE INDEX IF NOT EXISTS idx_relaciones_modelo ON relaciones_uml(modelo_id);
 CREATE INDEX IF NOT EXISTS idx_relaciones_origen ON relaciones_uml(clase_origen_id);
 CREATE INDEX IF NOT EXISTS idx_relaciones_destino ON relaciones_uml(clase_destino_id);
+
+-- ====================================================================
+-- FASE 6: Sistema de Versiones, Historial y Control de Cambios UML
+-- ====================================================================
+
+-- 1. Tabla Versiones de Modelo UML (Snapshots)
+CREATE TABLE IF NOT EXISTS versiones_modelo (
+    id BIGSERIAL PRIMARY KEY,
+    numero_version VARCHAR(50) NOT NULL,
+    nombre_version VARCHAR(150) NOT NULL,
+    descripcion VARCHAR(1000),
+    snapshot_json TEXT NOT NULL,
+    modelo_id BIGINT NOT NULL,
+    usuario_creador_id BIGINT,
+    fecha_creacion TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    estado VARCHAR(50) NOT NULL DEFAULT 'ACTIVA',
+    CONSTRAINT fk_version_modelo FOREIGN KEY (modelo_id)
+        REFERENCES modelos_uml(id) ON DELETE CASCADE,
+    CONSTRAINT fk_version_usuario FOREIGN KEY (usuario_creador_id)
+        REFERENCES usuarios(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_versiones_modelo ON versiones_modelo(modelo_id);
+CREATE INDEX IF NOT EXISTS idx_versiones_fecha ON versiones_modelo(fecha_creacion);
+CREATE INDEX IF NOT EXISTS idx_versiones_usuario ON versiones_modelo(usuario_creador_id);
+
+-- 2. Tabla Historial de Cambios Atómicos
+CREATE TABLE IF NOT EXISTS historial_cambios (
+    id BIGSERIAL PRIMARY KEY,
+    tipo_operacion VARCHAR(50) NOT NULL,
+    elemento_modificado VARCHAR(100) NOT NULL,
+    id_elemento VARCHAR(100),
+    datos_anteriores TEXT,
+    datos_nuevos TEXT,
+    usuario_id BIGINT,
+    usuario_email VARCHAR(150) NOT NULL,
+    fecha_cambio TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version_modelo_id BIGINT,
+    modelo_id BIGINT NOT NULL,
+    CONSTRAINT fk_historial_modelo FOREIGN KEY (modelo_id)
+        REFERENCES modelos_uml(id) ON DELETE CASCADE,
+    CONSTRAINT fk_historial_version FOREIGN KEY (version_modelo_id)
+        REFERENCES versiones_modelo(id) ON DELETE SET NULL,
+    CONSTRAINT fk_historial_usuario FOREIGN KEY (usuario_id)
+        REFERENCES usuarios(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_historial_modelo ON historial_cambios(modelo_id);
+CREATE INDEX IF NOT EXISTS idx_historial_fecha ON historial_cambios(fecha_cambio);
+CREATE INDEX IF NOT EXISTS idx_historial_version ON historial_cambios(version_modelo_id);
+
+-- ====================================================================
+-- FASE 7: Agente de Inteligencia Artificial para Edición UML
+-- ====================================================================
+
+CREATE TABLE IF NOT EXISTS ai_comandos_historial (
+    id BIGSERIAL PRIMARY KEY,
+    tipo_operacion VARCHAR(50) NOT NULL,
+    elemento_objetivo VARCHAR(100),
+    parametros TEXT,
+    prompt_original TEXT NOT NULL,
+    respuesta_generada TEXT,
+    exitoso BOOLEAN NOT NULL DEFAULT TRUE,
+    requiere_confirmacion BOOLEAN NOT NULL DEFAULT FALSE,
+    usuario_id BIGINT,
+    usuario_email VARCHAR(150) NOT NULL,
+    fecha TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modelo_id BIGINT NOT NULL,
+    CONSTRAINT fk_ai_comando_modelo FOREIGN KEY (modelo_id)
+        REFERENCES modelos_uml(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ai_comando_usuario FOREIGN KEY (usuario_id)
+        REFERENCES usuarios(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_comandos_modelo ON ai_comandos_historial(modelo_id);
+CREATE INDEX IF NOT EXISTS idx_ai_comandos_fecha ON ai_comandos_historial(fecha);
+CREATE INDEX IF NOT EXISTS idx_ai_comandos_usuario ON ai_comandos_historial(usuario_id);
+
+

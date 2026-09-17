@@ -18,6 +18,10 @@ import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+import com.caseplatform.versioning.model.TipoOperacionHistorial;
+import com.caseplatform.versioning.service.VersionService;
+import org.springframework.beans.factory.annotation.Autowired;
+
 /**
  * Controlador de mensajería WebSocket / STOMP para eventos colaborativos en diagramas UML.
  */
@@ -28,6 +32,9 @@ public class UMLSocketController {
 
     private final SessionManager sessionManager;
     private final EventPublisher eventPublisher;
+
+    @Autowired(required = false)
+    private VersionService versionService;
 
     /**
      * Notificación de ingreso de un usuario al modelo.
@@ -132,6 +139,33 @@ public class UMLSocketController {
         if (event.getTipoOperacion() == TipoOperacionUML.DELETE && event.getElementoId() != null) {
             sessionManager.unlockElement(modeloId, event.getElementoId(), event.getUsuario());
             eventPublisher.publishLocks(modeloId, sessionManager.getActiveLocks(modeloId));
+        }
+
+        // Trazabilidad y registro en historial de cambios (Fase 6)
+        if (versionService != null && (event.getTipoOperacion() == TipoOperacionUML.CREATE
+                || event.getTipoOperacion() == TipoOperacionUML.UPDATE
+                || event.getTipoOperacion() == TipoOperacionUML.DELETE)) {
+            TipoOperacionHistorial tipoHistorial;
+            if (event.getTipoOperacion() == TipoOperacionUML.CREATE) {
+                tipoHistorial = TipoOperacionHistorial.CREATE;
+            } else if (event.getTipoOperacion() == TipoOperacionUML.DELETE) {
+                tipoHistorial = TipoOperacionHistorial.DELETE;
+            } else {
+                tipoHistorial = TipoOperacionHistorial.UPDATE;
+            }
+
+            String elementoDesc = event.getElementoTipo() != null ? event.getElementoTipo().name() : "Elemento UML";
+            String detalle = event.getDatosCambio() != null ? event.getDatosCambio().toString() : null;
+
+            versionService.registrarCambio(
+                    modeloId,
+                    tipoHistorial,
+                    elementoDesc,
+                    event.getElementoId(),
+                    null,
+                    detalle,
+                    event.getUsuario()
+            );
         }
 
         // Difundir evento al grupo

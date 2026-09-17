@@ -14,6 +14,9 @@ import {
   ProyectoUML,
 } from '../features/uml-editor/models/uml.types';
 import { websocketService } from '../features/uml-editor/services/websocketService';
+import { VersionPanel } from '../features/versioning';
+import { AIChatPanel } from '../features/ai';
+import { ImageUMLModal } from '../features/imageuml';
 import '../features/uml-editor/styles/uml-editor.css';
 import { ArrowLeft, Layers } from 'lucide-react';
 
@@ -25,6 +28,9 @@ export const UMLEditorPage: React.FC = () => {
   const [selectedModeloId, setSelectedModeloId] = useState<number | null>(null);
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [isRelationModalOpen, setIsRelationModalOpen] = useState(false);
+  const [isVersioningOpen, setIsVersioningOpen] = useState(false);
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+  const [isImageUMLOpen, setIsImageUMLOpen] = useState(false);
 
   const {
     modelo,
@@ -32,6 +38,7 @@ export const UMLEditorPage: React.FC = () => {
     createClass,
     createRelation,
     deleteSelected,
+    restoreModeloState,
     undo,
     redo,
     error,
@@ -188,6 +195,9 @@ export const UMLEditorPage: React.FC = () => {
         <Toolbar
           onOpenCreateClass={() => setIsClassModalOpen(true)}
           onOpenCreateRelation={() => setIsRelationModalOpen(true)}
+          onOpenVersioning={() => setIsVersioningOpen(true)}
+          onOpenAIChat={() => setIsAIChatOpen((prev) => !prev)}
+          onOpenImageUML={() => setIsImageUMLOpen(true)}
         />
 
         {/* Área Central: Canvas + Panel Lateral */}
@@ -209,6 +219,45 @@ export const UMLEditorPage: React.FC = () => {
           onClose={() => setIsRelationModalOpen(false)}
           onSubmit={handleCreateRelation}
         />
+
+        {/* Panel de Control de Versiones, Historial y Trazabilidad (Fase 6) */}
+        {selectedModeloId && (
+          <VersionPanel
+            isOpen={isVersioningOpen}
+            onClose={() => setIsVersioningOpen(false)}
+            modeloId={selectedModeloId}
+            nombreModelo={modelo?.nombre || 'Diagrama'}
+            versionActual={modelo?.version || '1.0'}
+            onVersionRestored={(restored) => {
+              restoreModeloState(restored);
+            }}
+          />
+        )}
+
+        {/* Asistente Inteligente de Edición UML por Texto y Voz (Fase 7) */}
+        {selectedModeloId && (
+          <AIChatPanel
+            isOpen={isAIChatOpen}
+            onClose={() => setIsAIChatOpen(false)}
+            modeloId={selectedModeloId}
+            nombreModelo={modelo?.nombre || 'Diagrama'}
+            onModelUpdated={(actualizado) => {
+              restoreModeloState(actualizado);
+            }}
+          />
+        )}
+
+        {/* Modal de Conversión de Imagen a UML con Visión Artificial (Fase 8) */}
+        {selectedModeloId && (
+          <ImageUMLModal
+            isOpen={isImageUMLOpen}
+            onClose={() => setIsImageUMLOpen(false)}
+            modeloId={selectedModeloId}
+            onModelApplied={(actualizado) => {
+              restoreModeloState(actualizado);
+            }}
+          />
+        )}
       </div>
     </ReactFlowProvider>
   );

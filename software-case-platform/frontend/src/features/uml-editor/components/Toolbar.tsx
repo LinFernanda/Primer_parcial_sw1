@@ -12,16 +12,25 @@ import {
   ZoomOut,
   Link2,
   Users,
+  History,
+  Sparkles,
+  Camera,
 } from 'lucide-react';
 
 interface ToolbarProps {
   onOpenCreateClass: () => void;
   onOpenCreateRelation: () => void;
+  onOpenVersioning?: () => void;
+  onOpenAIChat?: () => void;
+  onOpenImageUML?: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenCreateClass,
   onOpenCreateRelation,
+  onOpenVersioning,
+  onOpenAIChat,
+  onOpenImageUML,
 }) => {
   const {
     modelo,
@@ -104,6 +113,54 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           title="Guardar posiciones y modelo en el servidor"
         >
           <Save size={16} /> {isSaving ? 'Guardando...' : 'Guardar'}
+        </button>
+
+        <div className="uml-toolbar-divider" />
+
+        <button
+          className="uml-toolbar-btn"
+          onClick={onOpenVersioning}
+          title="Control de versiones, snapshots e historial de cambios (Fase 6)"
+        >
+          <History size={16} style={{ color: '#38bdf8' }} /> Versiones
+        </button>
+
+        <div className="uml-toolbar-divider" />
+
+        <button
+          className="uml-toolbar-btn"
+          onClick={onOpenAIChat}
+          title="Abrir Asistente IA para edición inteligente del diagrama UML (Fase 7)"
+          style={{
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+            border: '1px solid rgba(139, 92, 246, 0.5)',
+            color: '#c084fc',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontWeight: 600,
+          }}
+        >
+          <Sparkles size={16} style={{ color: '#a855f7' }} /> Asistente IA
+        </button>
+
+        <div className="uml-toolbar-divider" />
+
+        <button
+          className="uml-toolbar-btn"
+          onClick={onOpenImageUML}
+          title="Convertir imagen de diagrama a modelo UML editable con Visión Artificial (Fase 8)"
+          style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%)',
+            border: '1px solid rgba(56, 189, 248, 0.5)',
+            color: '#38bdf8',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontWeight: 600,
+          }}
+        >
+          <Camera size={16} style={{ color: '#38bdf8' }} /> Visión UML
         </button>
       </div>
 
