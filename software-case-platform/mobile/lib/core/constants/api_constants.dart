@@ -1,7 +1,11 @@
+import '../config/environment_config.dart';
+
 class ApiConstants {
-  // URLs por defecto
+  // URLs por defecto dinámicas según entorno (dev, staging, prod en AWS)
+  static String get defaultUrl => EnvironmentConfig.apiBaseUrl;
   static const String defaultLocalhostUrl = 'http://localhost:8080/api/v1';
   static const String defaultAndroidEmulatorUrl = 'http://10.0.2.2:8080/api/v1';
+  static const String defaultProductionAwsUrl = 'https://api.caseplatform.com/api/v1';
 
   // Rutas de autenticación
   static const String authLogin = '/auth/login';

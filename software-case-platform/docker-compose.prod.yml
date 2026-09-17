@@ -1,0 +1,120 @@
+version: '3.8'
+
+# ==============================================================================
+# FASE 13: ORQUESTACIÓN DE PRODUCCIÓN DOCKER COMPOSE PARA AWS
+# Despliegue seguro y de alta disponibilidad para ECS / EC2 / Producción
+# ==============================================================================
+
+services:
+  # Base de datos PostgreSQL en Producción (simulación local o puente a RDS)
+  postgres-prod:
+    image: postgres:16-alpine
+    container_name: case-platform-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-case_platform_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SecureProdPassword2026!}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-case_platform_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - case-prod-network
+
+  # Backend Spring Boot 3 en Producción
+  backend-prod:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: case-platform-backend-prod
+    restart: always
+    depends_on:
+      postgres-prod:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+      AWS_RDS_ENDPOINT: postgres-prod
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-case_platform_db}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-SecureProdPassword2026!}
+      DB_SSL_MODE: prefer
+      JWT_SECRET: ${JWT_SECRET:-ProdSuperSecretKeyCasePlatform2026SecureHex64BytesLongRequiredBySecurityGuidelines}
+      JWT_EXPIRATION_MS: 28800000 # 8 horas
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://caseplatform.com,https://app.caseplatform.com,http://localhost}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-case-platform-production-storage}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    ports:
+      - "8080:8080"
+    volumes:
+      - app_storage_prod:/app/data/storage
+      - app_logs_prod:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1536M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - case-prod-network
+
+  # Frontend Nginx + React en Producción
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api/v1
+        VITE_WS_URL: /ws
+    container_name: case-platform-frontend-prod
+    restart: always
+    depends_on:
+      backend-prod:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - case-prod-network
+
+networks:
+  case-prod-network:
+    driver: bridge
+
+volumes:
+  pgdata_prod:
+    driver: local
+  app_storage_prod:
+    driver: local
+  app_logs_prod:
+    driver: local

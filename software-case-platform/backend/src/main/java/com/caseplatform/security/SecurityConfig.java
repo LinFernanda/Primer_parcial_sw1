@@ -73,6 +73,11 @@ public class SecurityConfig {
                                 "/api/v1/health",
                                 "/api/v1/ping",
                                 "/api/v1/info",
+                                "/api/v1/storage/status",
+                                "/api/v1/storage/download",
+                                "/actuator/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
                                 "/ws/**",
                                 "/error"
                         ).permitAll()

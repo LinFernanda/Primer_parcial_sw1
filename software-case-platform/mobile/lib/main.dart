@@ -34,7 +34,7 @@ void main() async {
   final token = await storageService.getToken();
 
   final apiClient = ApiClient(
-    baseUrl: savedUrl ?? ApiConstants.defaultLocalhostUrl,
+    baseUrl: savedUrl ?? ApiConstants.defaultUrl,
     token: token,
   );
 

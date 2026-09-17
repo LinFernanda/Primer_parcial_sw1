@@ -8,8 +8,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      window.global = window;
+    </script>
   </head>
   <body>
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        var errDiv = document.createElement('div');
+        errDiv.id = 'client-error-banner';
+        errDiv.style = 'color:red; background:white; z-index:99999; position:fixed; top:0; left:0; width:100%; padding:20px; font-size:16px; border:2px solid red;';
+        errDiv.innerHTML = '<h1>Client JS Error:</h1><pre>' + msg + '\nat ' + url + ':' + line + ':' + col + '\n' + (error && error.stack ? error.stack : '') + '</pre>';
+        document.body.appendChild(errDiv);
+      };
+      window.onunhandledrejection = function(event) {
+        var errDiv = document.createElement('div');
+        errDiv.id = 'client-rejection-banner';
+        errDiv.style = 'color:red; background:white; z-index:99999; position:fixed; top:0; left:0; width:100%; padding:20px; font-size:16px; border:2px solid red;';
+        errDiv.innerHTML = '<h1>Unhandled Promise:</h1><pre>' + (event.reason && event.reason.stack ? event.reason.stack : event.reason) + '</pre>';
+        document.body.appendChild(errDiv);
+      };
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

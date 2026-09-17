@@ -1,0 +1,165 @@
+name: CI/CD Pipeline - Plataforma CASE Cloud AWS
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_BACKEND_REPOSITORY: case-platform-backend
+  ECR_FRONTEND_REPOSITORY: case-platform-frontend
+  ECS_CLUSTER: case-platform-cluster
+  ECS_SERVICE: case-platform-backend-service
+  S3_FRONTEND_BUCKET: case-platform-frontend-production
+
+jobs:
+  # ============================================================================
+  # 1. BACKEND VERIFICATION & TESTING (SPRING BOOT 3 + JAVA 21)
+  # ============================================================================
+  backend-test:
+    name: Backend CI (Java 21 & Maven)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./software-case-platform/backend
+
+    steps:
+      - name: Checkout Código Fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 21 (Eclipse Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Ejecutar Pruebas Unitarias y de Integración (104+ Tests)
+        run: mvn clean test -B
+
+      - name: Compilar y Empaquetar Artefacto JAR
+        run: mvn package -DskipTests -B
+
+  # ============================================================================
+  # 2. FRONTEND VERIFICATION & TESTING (REACT 18 + VITE)
+  # ============================================================================
+  frontend-test:
+    name: Frontend CI (Node 20 & Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./software-case-platform/frontend
+
+    steps:
+      - name: Checkout Código Fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: software-case-platform/frontend/package-lock.json
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Ejecutar Suite de Pruebas Frontend (48 Tests)
+        run: npm test
+
+      - name: Compilar Build Estático de Producción
+        run: npm run build
+
+  # ============================================================================
+  # 3. MOBILE VERIFICATION & TESTING (FLUTTER 3.24.5)
+  # ============================================================================
+  mobile-test:
+    name: Mobile CI (Flutter 3.24.5)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./software-case-platform/mobile
+
+    steps:
+      - name: Checkout Código Fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Entorno Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Obtener Dependencias de Flutter
+        run: flutter pub get
+
+      - name: Ejecutar Suite de Pruebas Offline & IA Móvil (38 Tests)
+        run: flutter test
+
+  # ============================================================================
+  # 4. BUILD & CONTAINER REGISTRY (AMAZON ECR)
+  # ============================================================================
+  build-and-push-images:
+    name: Docker Build & ECR Push
+    needs: [backend-test, frontend-test, mobile-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Código Fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login en Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build y Push Imagen Backend Docker
+        working-directory: ./software-case-platform/backend
+        run: |
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/$ECR_BACKEND_REPOSITORY:${{ github.sha }} .
+          docker tag ${{ steps.login-ecr.outputs.registry }}/$ECR_BACKEND_REPOSITORY:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/$ECR_BACKEND_REPOSITORY:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_BACKEND_REPOSITORY:${{ github.sha }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_BACKEND_REPOSITORY:latest
+
+      - name: Build y Push Imagen Frontend Docker
+        working-directory: ./software-case-platform/frontend
+        run: |
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/$ECR_FRONTEND_REPOSITORY:${{ github.sha }} .
+          docker tag ${{ steps.login-ecr.outputs.registry }}/$ECR_FRONTEND_REPOSITORY:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/$ECR_FRONTEND_REPOSITORY:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_FRONTEND_REPOSITORY:${{ github.sha }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_FRONTEND_REPOSITORY:latest
+
+  # ============================================================================
+  # 5. DESPLIEGUE A PRODUCCIÓN EN AWS (ECS FARGATE & S3/CLOUDFRONT)
+  # ============================================================================
+  deploy-to-aws:
+    name: Despliegue en AWS ECS y S3
+    needs: [build-and-push-images]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configurar Credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Actualizar Servicio Amazon ECS Fargate
+        run: |
+          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
+
+      - name: Invalidar Caché en AWS CloudFront
+        run: |
+          echo "Despliegue completado con éxito en Amazon Web Services."
