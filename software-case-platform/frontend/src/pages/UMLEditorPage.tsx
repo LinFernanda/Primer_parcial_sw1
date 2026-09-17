@@ -17,6 +17,8 @@ import { websocketService } from '../features/uml-editor/services/websocketServi
 import { VersionPanel } from '../features/versioning';
 import { AIChatPanel } from '../features/ai';
 import { ImageUMLModal } from '../features/imageuml';
+import { CodeGeneratorModal } from '../features/generator';
+import { EnterpriseArchitectModal } from '../features/enterprisearchitect';
 import '../features/uml-editor/styles/uml-editor.css';
 import { ArrowLeft, Layers } from 'lucide-react';
 
@@ -31,6 +33,8 @@ export const UMLEditorPage: React.FC = () => {
   const [isVersioningOpen, setIsVersioningOpen] = useState(false);
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [isImageUMLOpen, setIsImageUMLOpen] = useState(false);
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
+  const [isEAOpen, setIsEAOpen] = useState(false);
 
   const {
     modelo,
@@ -198,6 +202,8 @@ export const UMLEditorPage: React.FC = () => {
           onOpenVersioning={() => setIsVersioningOpen(true)}
           onOpenAIChat={() => setIsAIChatOpen((prev) => !prev)}
           onOpenImageUML={() => setIsImageUMLOpen(true)}
+          onOpenGenerator={() => setIsGeneratorOpen(true)}
+          onOpenEnterpriseArchitect={() => setIsEAOpen(true)}
         />
 
         {/* Área Central: Canvas + Panel Lateral */}
@@ -255,6 +261,30 @@ export const UMLEditorPage: React.FC = () => {
             modeloId={selectedModeloId}
             onModelApplied={(actualizado) => {
               restoreModeloState(actualizado);
+            }}
+          />
+        )}
+
+        {/* Modal de Generación Automática de Backend Spring Boot (Fase 9) */}
+        {selectedModeloId && (
+          <CodeGeneratorModal
+            isOpen={isGeneratorOpen}
+            onClose={() => setIsGeneratorOpen(false)}
+            modeloId={selectedModeloId}
+            nombreModelo={modelo?.nombre}
+          />
+        )}
+
+        {/* Modal de Interoperabilidad con Enterprise Architect (Fase 10) */}
+        {selectedModeloId && (
+          <EnterpriseArchitectModal
+            isOpen={isEAOpen}
+            onClose={() => setIsEAOpen(false)}
+            modeloId={selectedModeloId}
+            onModelImported={() => {
+              if (selectedModeloId) {
+                loadModelo(selectedModeloId);
+              }
             }}
           />
         )}

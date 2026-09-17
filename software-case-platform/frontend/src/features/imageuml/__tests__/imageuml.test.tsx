@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, renderHook, act } from '@testing-library/react';
-import React from 'react';
 import { imageUmlService } from '../services/imageUmlService';
 import { useImageUML } from '../hooks/useImageUML';
 import { ImageUploader } from '../components/ImageUploader';

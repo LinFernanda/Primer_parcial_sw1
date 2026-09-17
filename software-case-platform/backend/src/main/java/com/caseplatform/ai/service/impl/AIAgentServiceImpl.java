@@ -73,6 +73,12 @@ public class AIAgentServiceImpl implements AIAgentService {
     @Autowired(required = false)
     private VersionService versionService;
 
+    @Autowired(required = false)
+    private com.caseplatform.generator.service.BackendGeneratorService backendGeneratorService;
+
+    @Autowired(required = false)
+    private com.caseplatform.integration.enterprisearchitect.service.EnterpriseArchitectExportService eaExportService;
+
     @Override
     @Transactional
     public AICommandResponse procesarComando(Long modeloId, AICommandRequest request, String usuarioEmail) {
@@ -145,6 +151,15 @@ public class AIAgentServiceImpl implements AIAgentService {
                     break;
                 case DELETE_RELATION:
                     mensajeRespuesta = ejecutarEliminarRelacion(modelo, accion, usuarioEmail);
+                    break;
+                case GENERATE_BACKEND:
+                    mensajeRespuesta = ejecutarGenerarBackend(modelo, usuarioEmail);
+                    break;
+                case EXPORT_ENTERPRISE_ARCHITECT:
+                    mensajeRespuesta = ejecutarExportarEA(modelo, usuarioEmail);
+                    break;
+                case IMPORT_ENTERPRISE_ARCHITECT:
+                    mensajeRespuesta = "Para importar modelos desde Enterprise Architect, utiliza el botón 'Enterprise Architect' en la barra de herramientas o realiza un POST a /api/integration/ea/models/" + modelo.getId() + "/import con tu archivo XMI.";
                     break;
                 default:
                     exitoso = false;
@@ -586,6 +601,31 @@ public class AIAgentServiceImpl implements AIAgentService {
         } catch (Exception e) {
             log.warn("No se pudo difundir evento colaborativo por WebSocket: {}", e.getMessage());
         }
+    }
+
+    private String ejecutarGenerarBackend(ModeloUML modelo, String usuarioEmail) {
+        if (backendGeneratorService == null) {
+            return "El motor de generación automática de backend no se encuentra disponible actualmente.";
+        }
+        var response = backendGeneratorService.generateProject(modelo.getId(), null, usuarioEmail);
+        return String.format(
+                "¡Proyecto Spring Boot '%s' generado exitosamente! Se generaron %d entidades y %d archivos en total. " +
+                "El paquete descargable .ZIP está disponible para su descarga.",
+                response.getProjectName(), response.getTotalEntities(), response.getTotalFiles()
+        );
+    }
+
+    private String ejecutarExportarEA(ModeloUML modelo, String usuarioEmail) {
+        if (eaExportService == null) {
+            return "El módulo de exportación a Enterprise Architect no se encuentra disponible actualmente.";
+        }
+        var meta = eaExportService.exportModel(modelo.getId(), usuarioEmail);
+        return String.format(
+                "¡Modelo UML exportado exitosamente a formato Enterprise Architect XMI 2.1! " +
+                "Total de clases: %d, relaciones: %d. Archivo disponible: '%s' (%d bytes). " +
+                "Puedes descargarlo directamente desde el menú 'Enterprise Architect'.",
+                meta.getTotalClases(), meta.getTotalRelaciones(), meta.getNombreArchivo(), meta.getTamanoBytes()
+        );
     }
 
     private void registrarHistorialComando(ModeloUML modelo, Usuario usuario, String usuarioEmail,

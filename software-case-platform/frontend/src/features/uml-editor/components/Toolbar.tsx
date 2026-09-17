@@ -15,6 +15,8 @@ import {
   History,
   Sparkles,
   Camera,
+  Code2,
+  FolderSync,
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -23,6 +25,8 @@ interface ToolbarProps {
   onOpenVersioning?: () => void;
   onOpenAIChat?: () => void;
   onOpenImageUML?: () => void;
+  onOpenGenerator?: () => void;
+  onOpenEnterpriseArchitect?: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -31,6 +35,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenVersioning,
   onOpenAIChat,
   onOpenImageUML,
+  onOpenGenerator,
+  onOpenEnterpriseArchitect,
 }) => {
   const {
     modelo,
@@ -161,6 +167,44 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           }}
         >
           <Camera size={16} style={{ color: '#38bdf8' }} /> Visión UML
+        </button>
+
+        <div className="uml-toolbar-divider" />
+
+        <button
+          className="uml-toolbar-btn"
+          onClick={onOpenGenerator}
+          title="Generar proyecto backend Spring Boot ejecutable desde el modelo UML (Fase 9)"
+          style={{
+            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%)',
+            border: '1px solid rgba(37, 99, 235, 0.5)',
+            color: '#60a5fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontWeight: 600,
+          }}
+        >
+          <Code2 size={16} style={{ color: '#60a5fa' }} /> Generar Backend
+        </button>
+
+        <div className="uml-toolbar-divider" />
+
+        <button
+          className="uml-toolbar-btn"
+          onClick={onOpenEnterpriseArchitect}
+          title="Interoperabilidad con Enterprise Architect: Importar y Exportar modelos en formato XMI (Fase 10)"
+          style={{
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.15) 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.5)',
+            color: '#f59e0b',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontWeight: 600,
+          }}
+        >
+          <FolderSync size={16} style={{ color: '#f59e0b' }} /> Enterprise Architect
         </button>
       </div>
 

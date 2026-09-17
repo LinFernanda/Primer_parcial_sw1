@@ -139,6 +139,39 @@ public class AICommandParser {
         String lower = p.toLowerCase();
 
         // ---------------------------------------------------------------------
+        // CASO GENERACIÓN BACKEND SPRING BOOT (Fase 9 - Integración con IA)
+        // Ej: "Generar backend del modelo actual", "Generar backend", "Generar proyecto Spring Boot"
+        // ---------------------------------------------------------------------
+        if (lower.contains("generar backend") || lower.contains("generar spring boot")
+                || lower.contains("generar codigo") || lower.contains("generar código")
+                || lower.contains("descargar backend") || lower.contains("exportar backend")) {
+            return ParsedAIAction.builder()
+                    .tipoOperacion(TipoOperacionAI.GENERATE_BACKEND)
+                    .explicacion("Generar proyecto backend Spring Boot completo desde el modelo UML actual")
+                    .build();
+        }
+
+        // ---------------------------------------------------------------------
+        // CASO ENTERPRISE ARCHITECT / XMI (Fase 10 - Integración con IA)
+        // Ej: "Exportar a Enterprise Architect", "Exportar XMI", "Descargar XMI"
+        // ---------------------------------------------------------------------
+        if (lower.contains("exportar a enterprise architect") || lower.contains("exportar ea")
+                || lower.contains("exportar xmi") || lower.contains("descargar xmi")
+                || lower.contains("guardar como xmi")) {
+            return ParsedAIAction.builder()
+                    .tipoOperacion(TipoOperacionAI.EXPORT_ENTERPRISE_ARCHITECT)
+                    .explicacion("Exportar el modelo UML actual al formato estándar XMI 2.1 para Enterprise Architect")
+                    .build();
+        }
+        if (lower.contains("importar de enterprise architect") || lower.contains("importar ea")
+                || lower.contains("importar xmi") || lower.contains("cargar xmi")) {
+            return ParsedAIAction.builder()
+                    .tipoOperacion(TipoOperacionAI.IMPORT_ENTERPRISE_ARCHITECT)
+                    .explicacion("Importar diagrama UML desde archivo XMI compatible con Enterprise Architect")
+                    .build();
+        }
+
+        // ---------------------------------------------------------------------
         // RESTRICCIÓN ESTRICTA: No generar sistemas completos desde cero (Fase 7)
         // ---------------------------------------------------------------------
         if (lower.contains("sistema completo") || lower.contains("todo el sistema")

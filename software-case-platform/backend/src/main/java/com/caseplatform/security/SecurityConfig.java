@@ -82,7 +82,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/users/**").hasAnyRole("ADMIN", "INGENIERO")
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
 
-                        // Rutas protegidas del Núcleo UML 2.5
+                        // Rutas protegidas del Núcleo UML 2.5, Versiones, IA, Visión y Generador
                         .requestMatchers(
                                 "/api/proyectos/**",
                                 "/api/modelos/**",
@@ -92,7 +92,10 @@ public class SecurityConfig {
                                 "/api/metodos/**",
                                 "/api/versiones/**",
                                 "/api/projects/**",
-                                "/api/models/**"
+                                "/api/models/**",
+                                "/api/imageuml/**",
+                                "/api/generator/**",
+                                "/api/integration/**"
                         ).authenticated()
 
                         // Cualquier otra petición debe estar autenticada
