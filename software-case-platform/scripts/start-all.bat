@@ -24,8 +24,8 @@ echo   Backend API:   http://localhost:8080/api/v1/health
 echo   Swagger UI:    http://localhost:8080/swagger-ui.html
 echo.
 echo   Credenciales:
-echo   - Correo:      admin@caseplatform.com  (o ingeniero@caseplatform.com)
-echo   - Password:    Admin123!               (o Ingeniero123!)
+echo   - Administrador: admin@caseplatform.com     (Password: Admin123*)
+echo   - Ingeniero:     ingeniero@caseplatform.com (Password: Ingeniero123*)
 echo ===================================================================
 echo.
 pause
