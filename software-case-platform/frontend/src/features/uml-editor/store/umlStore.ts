@@ -109,7 +109,16 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
   broadcastNodePosition: (claseId: number, x: number, y: number) => {
     const { modelo } = get();
     if (!modelo) return;
-    const userEmail = localStorage.getItem('userEmail') || 'ingeniero@caseplatform.com';
+    const userEmail = (() => {
+      const stored = localStorage.getItem('userEmail');
+      if (stored) return stored;
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u.email || 'ingeniero@caseplatform.com';
+      } catch {
+        return 'ingeniero@caseplatform.com';
+      }
+    })();
     websocketService.sendEvent(modelo.id, {
       usuario: userEmail,
       tipoOperacion: 'UPDATE',
@@ -125,7 +134,16 @@ export const useUMLStore = create<UMLStoreState>((set, get) => ({
     const { modelo } = get();
     if (!modelo || modelo.id !== event.modeloUMLId) return;
 
-    const currentUser = localStorage.getItem('userEmail');
+    const currentUser = (() => {
+      const stored = localStorage.getItem('userEmail');
+      if (stored) return stored;
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u.email || null;
+      } catch {
+        return null;
+      }
+    })();
     if (event.usuario === currentUser) return; // Evitar duplicar modificaciones ya reflejadas localmente
 
     if (event.tipoOperacion === 'CREATE' && event.elementoTipo === 'CLASE' && event.datosCambio?.clase) {

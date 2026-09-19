@@ -112,10 +112,17 @@ export const PropertiesPanel: React.FC = () => {
   const clase = modelo?.clases.find((c) => c.id === selectedClassId);
   if (!clase) return null;
 
-  const currentUser =
-    typeof window !== 'undefined' && window.localStorage
-      ? window.localStorage.getItem('userEmail') || ''
-      : '';
+  const currentUser = (() => {
+    if (typeof window === 'undefined' || !window.localStorage) return '';
+    const stored = window.localStorage.getItem('userEmail');
+    if (stored) return stored;
+    try {
+      const userObj = JSON.parse(window.localStorage.getItem('user') || '{}');
+      return userObj.email || '';
+    } catch {
+      return '';
+    }
+  })();
   const classLock = lockedElements.find((l) => l.elementoId === selectedClassId?.toString());
   const isLockedByOther = !!classLock && classLock.usuario !== currentUser;
 

@@ -47,7 +47,19 @@ public class AICommandParser {
 
         String promptLimpio = prompt.trim();
 
-        // 1. Si la API Key de OpenAI / LLM está configurada, intentar orquestación con modelo LLM
+        // 1. Si la API Key de Google Gemini está configurada, intentar orquestación con Gemini LLM
+        if (aiConfig.getGeminiApiKey() != null && !aiConfig.getGeminiApiKey().isBlank()) {
+            try {
+                ParsedAIAction geminiResult = parseWithGemini(promptLimpio);
+                if (geminiResult != null && geminiResult.getTipoOperacion() != TipoOperacionAI.UNKNOWN) {
+                    return geminiResult;
+                }
+            } catch (Exception e) {
+                log.warn("Fallo la llamada a Gemini LLM, recurriendo a motor local: {}", e.getMessage());
+            }
+        }
+
+        // 2. Si la API Key de OpenAI / LLM está configurada, intentar orquestación con OpenAI
         if (aiConfig.getApiKey() != null && !aiConfig.getApiKey().isBlank()) {
             try {
                 ParsedAIAction llmResult = parseWithLLM(promptLimpio);
@@ -60,7 +72,7 @@ public class AICommandParser {
             }
         }
 
-        // 2. Motor NLP semántico determinístico local (español e inglés)
+        // 3. Motor NLP semántico determinístico local (español e inglés)
         return parseWithRuleEngine(promptLimpio);
     }
 
@@ -126,6 +138,81 @@ public class AICommandParser {
                 return objectMapper.readValue(content, ParsedAIAction.class);
             } catch (Exception e) {
                 log.error("Error al parsear respuesta JSON de OpenAI: {}", e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Interpretación asistida por Google Gemini LLM (Google AI Studio).
+     */
+    private ParsedAIAction parseWithGemini(String prompt) {
+        String systemPrompt = """
+                Eres un asistente experto en ingeniería de software y modelado conceptual UML 2.5.
+                Tu función exclusiva es interpretar comandos del usuario en lenguaje natural y convertirlos
+                en una acción JSON estructurada para manipular el diagrama UML existente.
+                
+                IMPORTANTE: NO debes generar sistemas completos desde cero. Solo traduce la orden directa del usuario.
+                
+                Responde ÚNICAMENTE con un JSON válido con la siguiente estructura:
+                {
+                  "tipoOperacion": "CREATE_CLASS | UPDATE_CLASS | DELETE_CLASS | CREATE_ATTRIBUTE | UPDATE_ATTRIBUTE | DELETE_ATTRIBUTE | CREATE_RELATION | UPDATE_RELATION | DELETE_RELATION | CONFIRMATION_REQUIRED | UNKNOWN",
+                  "nombreClase": "Nombre de clase o null",
+                  "nuevoNombreClase": "Nuevo nombre si es rename o null",
+                  "nombreAtributo": "Nombre de atributo o null",
+                  "nuevoNombreAtributo": "Nuevo nombre si es rename o null",
+                  "tipoDatoAtributo": "String, Integer, Double, Boolean, Long, etc.",
+                  "visibilidad": "PUBLIC, PRIVATE, PROTECTED, PACKAGE",
+                  "claseOrigen": "Clase origen de relación o null",
+                  "claseDestino": "Clase destino de relación o null",
+                  "tipoRelacion": "ASOCIACION, HERENCIA, AGREGACION, COMPOSICION, DEPENDENCIA",
+                  "cardinalidadOrigen": "1, 0..1, *, 1..*",
+                  "cardinalidadDestino": "1, 0..1, *, 1..*",
+                  "descripcion": "Descripción o null",
+                  "requiereConfirmacion": false,
+                  "preguntaConfirmacion": null,
+                  "atributos": [
+                    {"nombre": "campo", "tipo": "String", "visibilidad": "PRIVATE"}
+                  ],
+                  "explicacion": "Breve confirmación de la acción interpretada"
+                }
+                
+                Si la orden es ambigua (ej. 'Crear cliente' sin especificar si es clase), establece tipoOperacion en 'CONFIRMATION_REQUIRED', requiereConfirmacion en true y formula preguntaConfirmacion.
+                No incluyas explicaciones ni bloques markdown fuera del JSON.
+                """;
+
+        Map<String, Object> textPart = Map.of("text", systemPrompt + "\n\nOrden del usuario:\n" + prompt);
+        Map<String, Object> contentObj = Map.of("parts", List.of(textPart));
+        Map<String, Object> requestBody = Map.of(
+                "contents", List.of(contentObj),
+                "generationConfig", Map.of(
+                        "temperature", 0.0,
+                        "responseMimeType", "application/json"
+                )
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        List<String> models = List.of("gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash");
+        for (String model : models) {
+            String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + aiConfig.getGeminiApiKey().trim();
+            try {
+                ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    JsonNode root = objectMapper.readTree(response.getBody());
+                    JsonNode candidates = root.path("candidates");
+                    if (candidates.isArray() && !candidates.isEmpty()) {
+                        String jsonText = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
+                        if (jsonText.startsWith("```")) {
+                            jsonText = jsonText.replaceAll("^```[a-zA-Z]*\\s*", "").replaceAll("\\s*```$", "");
+                        }
+                        return objectMapper.readValue(jsonText, ParsedAIAction.class);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Fallo o demanda alta en Gemini ({}) para comando NLP: {}", model, e.getMessage());
             }
         }
         return null;

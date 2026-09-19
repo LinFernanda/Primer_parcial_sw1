@@ -132,4 +132,80 @@ class UMLTextParserTest {
         assertEquals("*", parser.normalizeCardinality("n"));
         assertEquals("1..*", parser.normalizeCardinality("1..n"));
     }
+
+    @Test
+    @DisplayName("Debe parsear clases con ruido de bordes OCR (| y +----+)")
+    void testParseClassesWithOcrBoxBorders() {
+        String diagramaTexto = """
+                +------------------------+
+                |      Factura           |
+                +------------------------+
+                | - numero: String       |
+                | - total: Double        |
+                | - pagada: boolean      |
+                +------------------------+
+                | + pagar(): void        |
+                +------------------------+
+                """;
+
+        List<ClaseDetectadaDTO> clases = parser.parseClassesFromText(diagramaTexto);
+        assertNotNull(clases);
+        assertEquals(1, clases.size());
+
+        ClaseDetectadaDTO factura = clases.get(0);
+        assertEquals("Factura", factura.getNombre());
+        assertEquals(3, factura.getAtributos().size());
+        assertEquals("numero", factura.getAtributos().get(0).getNombre());
+        assertEquals("total", factura.getAtributos().get(1).getNombre());
+        assertEquals("pagada", factura.getAtributos().get(2).getNombre());
+        assertEquals("Boolean", factura.getAtributos().get(2).getTipoDato());
+        assertEquals(1, factura.getMetodos().size());
+        assertEquals("pagar", factura.getMetodos().get(0).getNombre());
+    }
+
+    @Test
+    @DisplayName("Debe parsear clases en formato PlantUML / bloques con llaves")
+    void testParseClassesPlantUML() {
+        String plantUml = """
+                class Usuario {
+                  - id: Long
+                  - email: String
+                  + login(): Boolean
+                }
+
+                class Rol {
+                  - codigo: String
+                  - descripcion: String
+                }
+
+                Usuario *-- 1..* Rol : posee
+                """;
+
+        List<ClaseDetectadaDTO> clases = parser.parseClassesFromText(plantUml);
+        assertEquals(2, clases.size());
+        assertEquals("Usuario", clases.get(0).getNombre());
+        assertEquals("Rol", clases.get(1).getNombre());
+
+        List<RelacionDetectadaDTO> relaciones = parser.parseRelationsFromText(plantUml);
+        assertEquals(1, relaciones.size());
+        assertEquals("Usuario", relaciones.get(0).getClaseOrigen());
+        assertEquals("Rol", relaciones.get(0).getClaseDestino());
+        assertEquals(TipoRelacionUML.COMPOSICION, relaciones.get(0).getTipoRelacion());
+    }
+
+    @Test
+    @DisplayName("Debe detectar relaciones expresadas textualmente en lenguaje natural")
+    void testParseTextualRelations() {
+        String texto = """
+                Administrador hereda de Persona
+                Pedido contiene Item
+                Auto tiene Motor
+                """;
+
+        List<RelacionDetectadaDTO> relaciones = parser.parseRelationsFromText(texto);
+        assertEquals(3, relaciones.size());
+        assertEquals(TipoRelacionUML.HERENCIA, relaciones.get(0).getTipoRelacion());
+        assertEquals(TipoRelacionUML.COMPOSICION, relaciones.get(1).getTipoRelacion());
+        assertEquals(TipoRelacionUML.AGREGACION, relaciones.get(2).getTipoRelacion());
+    }
 }

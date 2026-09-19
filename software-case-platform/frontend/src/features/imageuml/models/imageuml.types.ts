@@ -62,7 +62,7 @@ export interface ImageUploadResponseDTO {
 }
 
 export interface ApplyImageUMLRequestDTO {
-  idImagen: number;
+  idImagen?: number;
   modeloAjustado: ImageUMLDetectedDTO;
   limpiarModeloExistente: boolean;
   comentario?: string;

@@ -6,6 +6,7 @@ import com.caseplatform.exception.ResourceNotFoundException;
 import com.caseplatform.exception.ValidationException;
 import com.caseplatform.model.ModeloUML;
 import com.caseplatform.model.ProyectoUML;
+import com.caseplatform.model.Rol;
 import com.caseplatform.model.Usuario;
 import com.caseplatform.repository.ModeloUMLRepository;
 import com.caseplatform.repository.ProyectoUMLRepository;
@@ -67,6 +68,12 @@ public class ProyectoUMLServiceImpl implements ProyectoUMLService {
     @Override
     @Transactional(readOnly = true)
     public List<ProyectoUMLDTO> listarProyectos(String usuarioEmail) {
+        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(usuarioEmail.trim()).orElse(null);
+        if (usuario != null && usuario.getRol() == Rol.ADMIN) {
+            return proyectoUMLRepository.findAll().stream()
+                    .map(this::mapToDTO)
+                    .collect(Collectors.toList());
+        }
         return proyectoUMLRepository.findByUsuarioPropietarioEmailIgnoreCase(usuarioEmail.trim()).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());

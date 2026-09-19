@@ -10,10 +10,17 @@ interface ClassNodeData {
 export const ClassNode: React.FC<NodeProps<ClassNodeData>> = memo(({ data, selected }) => {
   const { clase } = data;
   const lockedElements = useUMLStore((s) => s.lockedElements);
-  const currentUser =
-    typeof window !== 'undefined' && window.localStorage
-      ? window.localStorage.getItem('userEmail') || ''
-      : '';
+  const currentUser = (() => {
+    if (typeof window === 'undefined' || !window.localStorage) return '';
+    const stored = window.localStorage.getItem('userEmail');
+    if (stored) return stored;
+    try {
+      const userObj = JSON.parse(window.localStorage.getItem('user') || '{}');
+      return userObj.email || '';
+    } catch {
+      return '';
+    }
+  })();
 
   const lock = lockedElements.find((l) => l.elementoId === clase.id?.toString());
   const isLockedByOther = lock && lock.usuario !== currentUser;

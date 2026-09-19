@@ -26,6 +26,11 @@ export const ImageUMLModal: React.FC<ImageUMLModalProps> = ({
     previewUml,
     currentProcessingStep,
     isLoading,
+    isOcrRunning,
+    ocrText,
+    setOcrText,
+    runOcrOnBlob,
+    processText,
     error,
     limpiarModeloExistente,
     setLimpiarModeloExistente,
@@ -151,6 +156,11 @@ export const ImageUMLModal: React.FC<ImageUMLModalProps> = ({
               onProcess={() => processImage(modeloId)}
               isLoading={isLoading}
               error={error}
+              ocrText={ocrText}
+              setOcrText={setOcrText}
+              onScanOcr={() => file && runOcrOnBlob(file)}
+              isOcrRunning={isOcrRunning}
+              onProcessText={(text) => processText(text)}
             />
           )}
 

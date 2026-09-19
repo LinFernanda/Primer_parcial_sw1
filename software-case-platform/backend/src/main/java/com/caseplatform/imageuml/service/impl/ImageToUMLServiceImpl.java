@@ -66,10 +66,17 @@ public class ImageToUMLServiceImpl implements ImageToUMLService {
     @Override
     @Transactional
     public ImageUploadResponseDTO subirYProcesarImagen(MultipartFile archivo, Long modeloId, String usuarioEmail) {
-        log.info("Recibiendo imagen para procesamiento UML: '{}', tamaño: {} bytes, usuario: {}",
+        return subirYProcesarImagen(archivo, modeloId, usuarioEmail, null);
+    }
+
+    @Override
+    @Transactional
+    public ImageUploadResponseDTO subirYProcesarImagen(MultipartFile archivo, Long modeloId, String usuarioEmail, String ocrText) {
+        log.info("Recibiendo imagen para procesamiento UML: '{}', tamaño: {} bytes, usuario: {}, ocrText: {}",
                 archivo != null ? archivo.getOriginalFilename() : "null",
                 archivo != null ? archivo.getSize() : 0,
-                usuarioEmail);
+                usuarioEmail,
+                (ocrText != null && !ocrText.isBlank()) ? (ocrText.length() + " caracteres") : "ninguno");
 
         validarArchivo(archivo);
 
@@ -86,8 +93,13 @@ public class ImageToUMLServiceImpl implements ImageToUMLService {
             BufferedImage originalImage = imageProcessorService.fromByteArray(rawBytes);
             BufferedImage preprocessedImage = imageProcessorService.preprocess(originalImage);
 
-            // 2. Detección y extracción de elementos conceptuales UML
-            ImageUMLDetectedDTO resultadoUML = umlDetectorService.detectUMLFromImage(preprocessedImage, rawBytes, originalFilename);
+            // 2. Detección y extracción de elementos conceptuales UML (incorporando OCR si está disponible)
+            ImageUMLDetectedDTO resultadoUML;
+            if (ocrText != null && !ocrText.isBlank()) {
+                resultadoUML = umlDetectorService.detectUMLFromImage(preprocessedImage, rawBytes, originalFilename, ocrText);
+            } else {
+                resultadoUML = umlDetectorService.detectUMLFromImage(preprocessedImage, rawBytes, originalFilename);
+            }
 
             // 3. Serializar resultado detectado para persistencia y auditoría
             String resultadoJson = objectMapper.writeValueAsString(resultadoUML);

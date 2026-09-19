@@ -12,9 +12,16 @@ public interface UMLDetectorService {
 
     /**
      * Procesa la imagen visual y detecta todas las clases, atributos, métodos,
-     * relaciones y cardinalidades presentes en el diagrama.
+     * relaciones y cardinalidades presentes en el diagrama, aprovechando texto OCR si está disponible.
      */
-    ImageUMLDetectedDTO detectUMLFromImage(BufferedImage image, byte[] imageBytes, String filename);
+    ImageUMLDetectedDTO detectUMLFromImage(BufferedImage image, byte[] imageBytes, String filename, String ocrText);
+
+    /**
+     * Sobrecarga compatible con versiones anteriores sin ocrText explícito.
+     */
+    default ImageUMLDetectedDTO detectUMLFromImage(BufferedImage image, byte[] imageBytes, String filename) {
+        return detectUMLFromImage(image, imageBytes, filename, null);
+    }
 
     /**
      * Detecta y estructura el modelo UML a partir de una descripción o transcripción textual.

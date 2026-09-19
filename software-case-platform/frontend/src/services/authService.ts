@@ -24,6 +24,12 @@ export const authService = {
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.usuario));
+      if (response.data.usuario?.email) {
+        localStorage.setItem('userEmail', response.data.usuario.email);
+      }
+      if (response.data.usuario?.nombreCompleto) {
+        localStorage.setItem('userName', response.data.usuario.nombreCompleto);
+      }
     }
     return response.data;
   },
@@ -46,6 +52,8 @@ export const authService = {
   logout(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userName');
   },
 
   getCurrentUser(): UserProfile | null {

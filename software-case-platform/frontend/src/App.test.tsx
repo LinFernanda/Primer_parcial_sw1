@@ -12,6 +12,7 @@ describe('App Rendering Test', () => {
     );
 
     // Expect brand title to be rendered
-    expect(screen.getByText(/CASE Platform/i)).toBeDefined();
+    const matches = screen.getAllByText(/CASE Platform/i);
+    expect(matches.length).toBeGreaterThan(0);
   });
 });

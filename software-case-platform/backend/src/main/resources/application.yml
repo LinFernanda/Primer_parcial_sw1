@@ -50,6 +50,9 @@ logging:
     org.hibernate.SQL: WARN
 
 ai:
+  #gemini:
+   # api-key: ${GEMINI_API_KEY:${AI_GEMINI_API_KEY:AQ.Ab8RN6LUxPsNNeqTYleCHJPtEsW61yoNjAwNFvaTiGcrT6ZssA}}
+   # model: ${GEMINI_MODEL:gemini-flash-lite-latest}
   openai:
     api-key: ${AI_OPENAI_API_KEY:${OPENAI_API_KEY:}}
     model: ${AI_OPENAI_MODEL:gpt-4o-mini}

@@ -2,20 +2,28 @@ import { apiClient } from '../../../services/api';
 import {
   ApplyImageUMLRequestDTO,
   ImageUploadResponseDTO,
+  ImageUMLDetectedDTO,
   ModeloUML,
 } from '../models/imageuml.types';
 
 export const imageUmlService = {
   /**
    * Sube una imagen de diagrama UML (PNG, JPG, JPEG) y obtiene el modelo UML
-   * detectado mediante visión computacional y OCR.
+   * detectado mediante visión computacional, OCR (Tesseract) e IA.
    * POST /api/imageuml/upload
    */
-  async uploadImage(file: File, modeloId?: number): Promise<ImageUploadResponseDTO> {
+  async uploadImage(
+    file: File,
+    modeloId?: number,
+    ocrText?: string
+  ): Promise<ImageUploadResponseDTO> {
     const formData = new FormData();
     formData.append('file', file);
     if (modeloId !== undefined && modeloId !== null) {
       formData.append('modeloId', modeloId.toString());
+    }
+    if (ocrText && ocrText.trim()) {
+      formData.append('ocrText', ocrText.trim());
     }
 
     const response = await apiClient.post<ImageUploadResponseDTO>(
@@ -27,6 +35,19 @@ export const imageUmlService = {
         },
         timeout: 60000, // Permitir hasta 60s para procesamiento de visión artificial
       }
+    );
+    return response.data;
+  },
+
+  /**
+   * Parsea texto o especificación UML directamente (PlantUML, Mermaid o formato estructurado)
+   * sin requerir imagen.
+   * POST /api/imageuml/parse-text
+   */
+  async parseText(text: string): Promise<ImageUMLDetectedDTO> {
+    const response = await apiClient.post<ImageUMLDetectedDTO>(
+      '/api/imageuml/parse-text',
+      { text }
     );
     return response.data;
   },

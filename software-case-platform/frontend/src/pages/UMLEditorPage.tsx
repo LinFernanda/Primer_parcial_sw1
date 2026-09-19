@@ -78,8 +78,26 @@ export const UMLEditorPage: React.FC = () => {
   useEffect(() => {
     if (!selectedModeloId) return;
 
-    const userEmail = localStorage.getItem('userEmail') || 'ingeniero@caseplatform.com';
-    const userName = localStorage.getItem('userName') || userEmail.split('@')[0];
+    const userEmail = (() => {
+      const stored = localStorage.getItem('userEmail');
+      if (stored) return stored;
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u.email || 'ingeniero@caseplatform.com';
+      } catch {
+        return 'ingeniero@caseplatform.com';
+      }
+    })();
+    const userName = (() => {
+      const stored = localStorage.getItem('userName');
+      if (stored) return stored;
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u.nombreCompleto || userEmail.split('@')[0];
+      } catch {
+        return userEmail.split('@')[0];
+      }
+    })();
 
     websocketService.connect(
       selectedModeloId,

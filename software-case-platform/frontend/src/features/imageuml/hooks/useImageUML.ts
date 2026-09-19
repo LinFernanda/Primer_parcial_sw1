@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import Tesseract from 'tesseract.js';
 import {
   AtributoDetectadoDTO,
   ClaseDetectadaDTO,
@@ -24,6 +25,9 @@ export function useImageUML() {
   const [previewUml, setPreviewUml] = useState<ImageUMLDetectedDTO | null>(null);
   const [currentProcessingStep, setCurrentProcessingStep] = useState<string>('Procesando imagen...');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isOcrRunning, setIsOcrRunning] = useState<boolean>(false);
+  const [ocrProgress, setOcrProgress] = useState<number>(0);
+  const [ocrText, setOcrText] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [limpiarModeloExistente, setLimpiarModeloExistente] = useState<boolean>(false);
 
@@ -37,88 +41,152 @@ export function useImageUML() {
   }, [filePreviewUrl]);
 
   /**
+   * Ejecuta reconocimiento OCR en cliente con Tesseract.js
+   */
+  const runOcrOnBlob = useCallback(async (targetFile: File): Promise<string> => {
+    setIsOcrRunning(true);
+    setOcrProgress(0);
+    try {
+      const result = await Tesseract.recognize(targetFile, 'spa+eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text' && m.progress != null) {
+            const pct = Math.round(m.progress * 100);
+            setOcrProgress(pct);
+            setCurrentProcessingStep(`Reconociendo texto del diagrama con OCR (${pct}%)...`);
+          } else if (m.status) {
+            setCurrentProcessingStep(`OCR: ${m.status}...`);
+          }
+        },
+      });
+      const text = result?.data?.text || '';
+      setOcrText(text);
+      return text;
+    } catch (e) {
+      console.warn('Tesseract OCR local omitido o no disponible:', e);
+      return '';
+    } finally {
+      setIsOcrRunning(false);
+    }
+  }, []);
+
+  /**
    * Validación y selección de imagen desde input o dropzone
    */
-  const handleSelectFile = useCallback((selectedFile: File) => {
-    setError(null);
+  const handleSelectFile = useCallback(
+    (selectedFile: File) => {
+      setError(null);
 
-    // Validar tamaño
-    if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
-      setError(`El archivo supera el tamaño máximo permitido de 10 MB (${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB).`);
-      return false;
-    }
+      // Validar tamaño
+      if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
+        setError(
+          `El archivo supera el tamaño máximo permitido de 10 MB (${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB).`
+        );
+        return false;
+      }
 
-    if (selectedFile.size === 0) {
-      setError('El archivo seleccionado está vacío.');
-      return false;
-    }
+      if (selectedFile.size === 0) {
+        setError('El archivo seleccionado está vacío.');
+        return false;
+      }
 
-    // Validar extensión y mime type
-    const extension = selectedFile.name.split('.').pop()?.toLowerCase() || '';
-    const isExtensionValid = ALLOWED_EXTENSIONS.includes(extension);
-    const isMimeValid = ALLOWED_MIME_TYPES.includes(selectedFile.type) || isExtensionValid;
+      // Validar extensión y mime type
+      const extension = selectedFile.name.split('.').pop()?.toLowerCase() || '';
+      const isExtensionValid = ALLOWED_EXTENSIONS.includes(extension);
+      const isMimeValid = ALLOWED_MIME_TYPES.includes(selectedFile.type) || isExtensionValid;
 
-    if (!isExtensionValid && !isMimeValid) {
-      setError('Formato no soportado. Solo se permiten imágenes PNG, JPG o JPEG.');
-      return false;
-    }
+      if (!isExtensionValid && !isMimeValid) {
+        setError('Formato no soportado. Solo se permiten imágenes PNG, JPG o JPEG.');
+        return false;
+      }
 
-    // Revocar url anterior si existía
-    if (filePreviewUrl && filePreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(filePreviewUrl);
-    }
+      // Revocar url anterior si existía
+      if (filePreviewUrl && filePreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(filePreviewUrl);
+      }
 
-    const previewUrl = URL.createObjectURL(selectedFile);
-    setFile(selectedFile);
-    setFilePreviewUrl(previewUrl);
-    return true;
-  }, [filePreviewUrl]);
+      const previewUrl = URL.createObjectURL(selectedFile);
+      setFile(selectedFile);
+      setFilePreviewUrl(previewUrl);
+      setOcrText('');
+      return true;
+    },
+    [filePreviewUrl]
+  );
 
   /**
    * Ejecuta el pipeline de procesamiento visual, OCR e IA
    */
-  const processImage = useCallback(async (modeloId?: number) => {
-    if (!file) {
-      setError('Por favor selecciona una imagen para procesar.');
+  const processImage = useCallback(
+    async (modeloId?: number, textOverride?: string) => {
+      if (!file) {
+        setError('Por favor selecciona una imagen para procesar.');
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      setStep('processing');
+      setCurrentProcessingStep('Iniciando análisis del diagrama...');
+
+      try {
+        let textToUse = textOverride !== undefined ? textOverride : ocrText;
+
+        // Si no hay texto provisto, extraer con Tesseract OCR automáticamente
+        if (!textToUse || textToUse.trim() === '') {
+          setCurrentProcessingStep('Extrayendo texto de clases y atributos con OCR...');
+          textToUse = await runOcrOnBlob(file);
+        }
+
+        setCurrentProcessingStep('Detectando clases, relaciones y estructurando modelo UML...');
+        const response = await imageUmlService.uploadImage(file, modeloId, textToUse);
+
+        setUploadResponse(response);
+        // Clonar estructura para permitir edición manual sin mutar el original
+        setPreviewUml(JSON.parse(JSON.stringify(response.resultadoUML)));
+        setStep('preview');
+      } catch (err: any) {
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          'Error durante el procesamiento visual de la imagen.';
+        setError(msg);
+        setStep('upload');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [file, ocrText, runOcrOnBlob]
+  );
+
+  /**
+   * Parsea directamente un texto o código UML (ej. PlantUML o Mermaid)
+   */
+  const processText = useCallback(async (rawText: string) => {
+    if (!rawText || rawText.trim() === '') {
+      setError('Por favor introduce el texto o código del diagrama UML.');
       return;
     }
 
     setIsLoading(true);
     setError(null);
     setStep('processing');
-    setCurrentProcessingStep('Procesando imagen...');
-
-    // Temporizadores para feedback visual interactivo mientras el backend analiza
-    const timer1 = setTimeout(() => {
-      setCurrentProcessingStep('Detectando clases y entidades UML...');
-    }, 1200);
-
-    const timer2 = setTimeout(() => {
-      setCurrentProcessingStep('Generando modelo UML conceptual y relaciones...');
-    }, 2500);
+    setCurrentProcessingStep('Analizando sintaxis y estructura conceptual UML...');
 
     try {
-      const response = await imageUmlService.uploadImage(file, modeloId);
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-
-      setUploadResponse(response);
-      // Clonar estructura para permitir edición manual sin mutar el original
-      setPreviewUml(JSON.parse(JSON.stringify(response.resultadoUML)));
+      const response = await imageUmlService.parseText(rawText);
+      setPreviewUml(JSON.parse(JSON.stringify(response)));
       setStep('preview');
     } catch (err: any) {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
       const msg =
         err.response?.data?.message ||
         err.message ||
-        'Error durante el procesamiento visual de la imagen.';
+        'Error al analizar la estructura del texto UML.';
       setError(msg);
       setStep('upload');
     } finally {
       setIsLoading(false);
     }
-  }, [file]);
+  }, []);
 
   /**
    * Modificación manual de clases detectadas
@@ -269,7 +337,7 @@ export function useImageUML() {
    */
   const applyToModel = useCallback(
     async (modeloId: number): Promise<ModeloUML> => {
-      if (!uploadResponse || !previewUml) {
+      if (!previewUml) {
         throw new Error('No hay un modelo detectado listo para aplicar.');
       }
 
@@ -278,10 +346,12 @@ export function useImageUML() {
 
       try {
         const modeloActualizado = await imageUmlService.applyDetectedModel(modeloId, {
-          idImagen: uploadResponse.idImagen,
+          idImagen: uploadResponse ? uploadResponse.idImagen : undefined,
           modeloAjustado: previewUml,
           limpiarModeloExistente,
-          comentario: `Importado desde imagen: ${uploadResponse.nombreArchivo}`,
+          comentario: uploadResponse
+            ? `Importado desde imagen: ${uploadResponse.nombreArchivo}`
+            : 'Importado desde transcripción UML',
         });
 
         setStep('applied');
@@ -312,6 +382,9 @@ export function useImageUML() {
     setFilePreviewUrl(null);
     setUploadResponse(null);
     setPreviewUml(null);
+    setOcrText('');
+    setOcrProgress(0);
+    setIsOcrRunning(false);
     setError(null);
     setIsLoading(false);
     setLimpiarModeloExistente(false);
@@ -326,11 +399,17 @@ export function useImageUML() {
     previewUml,
     currentProcessingStep,
     isLoading,
+    isOcrRunning,
+    ocrProgress,
+    ocrText,
+    setOcrText,
+    runOcrOnBlob,
     error,
     limpiarModeloExistente,
     setLimpiarModeloExistente,
     handleSelectFile,
     processImage,
+    processText,
     updateDetectedClass,
     deleteDetectedClass,
     addDetectedClass,

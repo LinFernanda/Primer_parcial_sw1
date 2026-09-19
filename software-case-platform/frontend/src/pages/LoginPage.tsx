@@ -132,6 +132,38 @@ export const LoginPage: React.FC = () => {
           </button>
         </form>
 
+        {!isRegister && (
+          <div style={{ marginTop: '16px', padding: '12px', background: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
+            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', fontWeight: 600 }}>
+              Credenciales de prueba preconfiguradas:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button
+                type="button"
+                className="uml-toolbar-btn"
+                style={{ fontSize: '12px', justifyContent: 'center', padding: '6px' }}
+                onClick={() => {
+                  setEmail('admin@caseplatform.com');
+                  setPassword('Admin123*');
+                }}
+              >
+                👑 Admin
+              </button>
+              <button
+                type="button"
+                className="uml-toolbar-btn"
+                style={{ fontSize: '12px', justifyContent: 'center', padding: '6px' }}
+                onClick={() => {
+                  setEmail('ingeniero@caseplatform.com');
+                  setPassword('Ingeniero123*');
+                }}
+              >
+                🛠️ Ingeniero
+              </button>
+            </div>
+          </div>
+        )}
+
         <div style={{ textAlign: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #334155', fontSize: '13px', color: '#94a3b8' }}>
           {isRegister ? (
             <span>

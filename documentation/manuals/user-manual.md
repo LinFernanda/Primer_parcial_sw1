@@ -9,9 +9,10 @@
 ### Inicio de Sesión
 1. Abra el navegador web en la URL de la plataforma (ej. `http://localhost:5173` en local o `https://app.caseplatform.com` en producción).
 2. Ingrese sus credenciales:
+   - **Correo de Administrador:** `admin@caseplatform.com`
+   - **Contraseña:** `Admin123*` (o `Admin123!`)
    - **Correo de Ingeniero:** `ingeniero@caseplatform.com`
-   - **Contraseña:** `Ingeniero123!`
-   - *(O `admin@caseplatform.com` / `Admin123!` para tareas de administración)*.
+   - **Contraseña:** `Ingeniero123*` (o `Ingeniero123!`)
 3. Al autenticarse correctamente, el sistema generará un token JWT seguro y lo redirigirá al panel principal de proyectos.
 
 ---

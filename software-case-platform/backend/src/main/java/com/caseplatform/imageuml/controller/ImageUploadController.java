@@ -27,23 +27,38 @@ import org.springframework.web.multipart.MultipartFile;
 public class ImageUploadController {
 
     private final ImageToUMLService imageToUMLService;
+    private final com.caseplatform.imageuml.detector.UMLDetectorService umlDetectorService;
 
     /**
      * Endpoint oficial según especificación de la Fase 8:
      * POST /api/imageuml/upload
-     * Recibe la imagen en formato multipart/form-data y retorna el resultado de visión computacional y OCR.
+     * Recibe la imagen en formato multipart/form-data (y opcionalmente texto OCR previo) y retorna el resultado.
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ImageUploadResponseDTO> uploadImage(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "modeloId", required = false) Long modeloId
+            @RequestParam(value = "modeloId", required = false) Long modeloId,
+            @RequestParam(value = "ocrText", required = false) String ocrText
     ) {
         String usuarioEmail = getAuthenticatedUserEmail();
-        log.info("Petición POST /api/imageuml/upload recibida para archivo: '{}', modeloId: {}, usuario: {}",
-                file != null ? file.getOriginalFilename() : "null", modeloId, usuarioEmail);
+        log.info("Petición POST /api/imageuml/upload recibida para archivo: '{}', modeloId: {}, usuario: {}, ocrText presente: {}",
+                file != null ? file.getOriginalFilename() : "null", modeloId, usuarioEmail, (ocrText != null && !ocrText.isBlank()));
 
-        ImageUploadResponseDTO response = imageToUMLService.subirYProcesarImagen(file, modeloId, usuarioEmail);
+        ImageUploadResponseDTO response = imageToUMLService.subirYProcesarImagen(file, modeloId, usuarioEmail, ocrText);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Parsea directamente una descripción o transcripción textual UML sin requerir subir archivo.
+     * POST /api/imageuml/parse-text
+     */
+    @PostMapping("/parse-text")
+    public ResponseEntity<com.caseplatform.imageuml.dto.ImageUMLDetectedDTO> parseText(
+            @RequestBody java.util.Map<String, String> body
+    ) {
+        String text = body != null ? body.get("text") : "";
+        com.caseplatform.imageuml.dto.ImageUMLDetectedDTO response = umlDetectorService.detectUMLFromText(text);
+        return ResponseEntity.ok(response);
     }
 
     /**

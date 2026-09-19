@@ -11,9 +11,16 @@ import org.springframework.web.multipart.MultipartFile;
 public interface ImageToUMLService {
 
     /**
-     * Valida, procesa y detecta los elementos UML de una imagen cargada.
+     * Valida, procesa y detecta los elementos UML de una imagen cargada con soporte para texto OCR previo.
      */
-    ImageUploadResponseDTO subirYProcesarImagen(MultipartFile archivo, Long modeloId, String usuarioEmail);
+    ImageUploadResponseDTO subirYProcesarImagen(MultipartFile archivo, Long modeloId, String usuarioEmail, String ocrText);
+
+    /**
+     * Sobrecarga compatible con versiones anteriores sin texto OCR.
+     */
+    default ImageUploadResponseDTO subirYProcesarImagen(MultipartFile archivo, Long modeloId, String usuarioEmail) {
+        return subirYProcesarImagen(archivo, modeloId, usuarioEmail, null);
+    }
 
     /**
      * Aplica el modelo UML detectado o editado en previsualización directamente
