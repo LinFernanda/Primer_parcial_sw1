@@ -143,17 +143,19 @@ flutter run
 
 ---
 
-## 6. Hoja de Ruta de Fases
+## 6. Hoja de Ruta de Fases y Alcances
+Para consultar la especificación exhaustiva de alcances dividida por módulos y fases, consulte [ALCANCES_DEL_PROYECTO.md](../documentation/requirements/ALCANCES_DEL_PROYECTO.md).
+
 - [x] **Fase 1:** Preparación del proyecto, arquitectura base y configuración inicial del entorno.
-- [ ] **Fase 2:** Sistema de usuarios, autenticación y seguridad (JWT / RBAC).
-- [ ] **Fase 3:** Núcleo UML 2.5 y modelo conceptual.
-- [ ] **Fase 4:** Editor visual UML 2.5.
-- [ ] **Fase 5:** Colaboración en tiempo real (WebSocket / STOMP).
-- [ ] **Fase 6:** Versiones, historial y control de cambios UML.
-- [ ] **Fase 7:** Agente IA para edición UML inteligente.
-- [ ] **Fase 8:** Conversión de imágenes a modelos UML (Visión Artificial).
-- [ ] **Fase 9:** Generador de backend Spring Boot desde UML.
-- [ ] **Fase 10:** Integración Enterprise Architect (XMI).
-- [ ] **Fase 11:** Aplicación móvil Flutter conectada al backend generado.
-- [ ] **Fase 12:** Modo offline y sincronización con IA local en móvil.
-- [ ] **Fase 13:** Despliegue en AWS, seguridad perimetral y entrega final.
+- [x] **Fase 2:** Sistema de usuarios, autenticación y seguridad (JWT / RBAC).
+- [x] **Fase 3:** Núcleo UML 2.5 y modelo conceptual.
+- [x] **Fase 4:** Editor visual UML 2.5.
+- [x] **Fase 5:** Colaboración en tiempo real (WebSocket / STOMP).
+- [x] **Fase 6:** Versiones, historial y control de cambios UML.
+- [x] **Fase 7:** Agente IA para edición UML inteligente.
+- [x] **Fase 8:** Conversión de imágenes a modelos UML (Visión Artificial).
+- [x] **Fase 9:** Generador de backend Spring Boot desde UML.
+- [x] **Fase 10:** Integración Enterprise Architect (XMI).
+- [x] **Fase 11:** Aplicación móvil Flutter conectada al backend generado.
+- [x] **Fase 12:** Modo offline y sincronización con IA local en móvil.
+- [x] **Fase 13:** Despliegue en AWS, seguridad perimetral y entrega final.

@@ -98,6 +98,9 @@ export const enterpriseArchitectService = {
       `/api/integration/ea/models/${modeloId}/export`,
       {
         responseType: 'blob',
+        headers: {
+          Accept: 'application/xml, text/xml, application/octet-stream, */*',
+        },
       }
     );
 

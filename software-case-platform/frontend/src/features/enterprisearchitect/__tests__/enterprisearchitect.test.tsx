@@ -146,9 +146,15 @@ describe('Fase 10: Interoperabilidad con Enterprise Architect mediante XMI', () 
       });
 
       await enterpriseArchitectService.downloadXMI(1, 'prueba.xml');
-      expect(apiClient.get).toHaveBeenCalledWith('/api/integration/ea/models/1/export', {
-        responseType: 'blob',
-      });
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/api/integration/ea/models/1/export',
+        expect.objectContaining({
+          responseType: 'blob',
+          headers: expect.objectContaining({
+            Accept: expect.stringContaining('application/xml'),
+          }),
+        })
+      );
       expect(window.URL.createObjectURL).toHaveBeenCalled();
     });
   });

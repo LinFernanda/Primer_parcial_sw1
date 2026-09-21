@@ -110,9 +110,19 @@ public class EnterpriseArchitectController {
 
     /**
      * Exporta el modelo UML a formato XMI y lo descarga como archivo XML/XMI.
+     * Soporta MediaType.APPLICATION_XML, APPLICATION_OCTET_STREAM, TEXT_XML y MediaType.ALL_VALUE
+     * para máxima compatibilidad con navegadores y clientes HTTP (incluyendo Axios con Accept: application/json).
      * GET /api/integration/ea/models/{modeloId}/export
      */
-    @GetMapping(value = "/models/{modeloId}/export", produces = MediaType.APPLICATION_XML_VALUE)
+    @GetMapping(
+            value = "/models/{modeloId}/export",
+            produces = {
+                    MediaType.APPLICATION_XML_VALUE,
+                    MediaType.APPLICATION_OCTET_STREAM_VALUE,
+                    MediaType.TEXT_XML_VALUE,
+                    MediaType.ALL_VALUE
+            }
+    )
     public ResponseEntity<byte[]> exportModelToXMI(
             @PathVariable Long modeloId
     ) {
@@ -120,7 +130,9 @@ public class EnterpriseArchitectController {
         log.info("Petición GET /api/integration/ea/models/{}/export por usuario: {}", modeloId, userEmail);
 
         XMIExportResponseDTO metadata = exportService.exportModel(modeloId, userEmail);
-        byte[] bytes = exportService.exportModelAsBytes(modeloId, userEmail);
+        byte[] bytes = metadata.getContenidoXML() != null
+                ? metadata.getContenidoXML().getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                : exportService.exportModelAsBytes(modeloId, userEmail);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + metadata.getNombreArchivo() + "\"")

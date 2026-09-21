@@ -121,10 +121,12 @@ public class XMIExporterImpl implements XMIExporter {
 
             // Generalizaciones (Herencia donde esta clase es la hija)
             for (RelacionUML rel : relaciones) {
-                if (rel.getTipoRelacion() == TipoRelacionUML.HERENCIA &&
+                if (rel != null && rel.getTipoRelacion() == TipoRelacionUML.HERENCIA &&
                     rel.getClaseOrigen() != null && rel.getClaseDestino() != null &&
-                    rel.getClaseOrigen().getId().equals(clase.getId())) {
-                    xml.append("        <generalization xmi:type=\"uml:Generalization\" xmi:id=\"EAID_GEN_").append(rel.getId())
+                    rel.getClaseOrigen().getId() != null && rel.getClaseDestino().getId() != null &&
+                    java.util.Objects.equals(rel.getClaseOrigen().getId(), clase.getId())) {
+                    String genId = rel.getId() != null ? String.valueOf(rel.getId()) : String.valueOf(System.identityHashCode(rel));
+                    xml.append("        <generalization xmi:type=\"uml:Generalization\" xmi:id=\"EAID_GEN_").append(genId)
                        .append("\" general=\"EAID_").append(rel.getClaseDestino().getId()).append("\"/>\n");
                 }
             }
@@ -134,9 +136,10 @@ public class XMIExporterImpl implements XMIExporter {
 
         // 2. Exportar Asociaciones, Composiciones, Agregaciones y Dependencias
         for (RelacionUML rel : relaciones) {
-            if (rel.getClaseOrigen() == null || rel.getClaseDestino() == null) continue;
+            if (rel == null || rel.getClaseOrigen() == null || rel.getClaseDestino() == null ||
+                rel.getClaseOrigen().getId() == null || rel.getClaseDestino().getId() == null) continue;
 
-            String rId = "EAID_REL_" + rel.getId();
+            String rId = "EAID_REL_" + (rel.getId() != null ? rel.getId() : System.identityHashCode(rel));
             String srcId = "EAID_" + rel.getClaseOrigen().getId();
             String dstId = "EAID_" + rel.getClaseDestino().getId();
 
@@ -152,7 +155,8 @@ public class XMIExporterImpl implements XMIExporter {
                    .append("\" visibility=\"public\"/>\n");
             } else {
                 // Asociación, Agregación o Composición
-                String aggregation = switch (rel.getTipoRelacion()) {
+                TipoRelacionUML tipo = rel.getTipoRelacion() != null ? rel.getTipoRelacion() : TipoRelacionUML.ASOCIACION;
+                String aggregation = switch (tipo) {
                     case COMPOSICION -> "composite";
                     case AGREGACION -> "shared";
                     default -> "none";
@@ -161,11 +165,11 @@ public class XMIExporterImpl implements XMIExporter {
                 String cardSrc = rel.getCardinalidadOrigen() != null ? rel.getCardinalidadOrigen() : "1";
                 String cardDst = rel.getCardinalidadDestino() != null ? rel.getCardinalidadDestino() : "1";
 
-                String endSrcId = "EAID_END_SRC_" + rel.getId();
-                String endDstId = "EAID_END_DST_" + rel.getId();
+                String endSrcId = "EAID_END_SRC_" + (rel.getId() != null ? rel.getId() : System.identityHashCode(rel));
+                String endDstId = "EAID_END_DST_" + (rel.getId() != null ? rel.getId() : System.identityHashCode(rel));
 
                 xml.append("      <packagedElement xmi:type=\"uml:Association\" xmi:id=\"").append(rId)
-                   .append("\" name=\"").append(escapeXml(rel.getDescripcion() != null ? rel.getDescripcion() : "rel_" + rel.getId()))
+                   .append("\" name=\"").append(escapeXml(rel.getDescripcion() != null ? rel.getDescripcion() : "rel_" + rId))
                    .append("\">\n");
 
                 xml.append("        <memberEnd xmi:idref=\"").append(endDstId).append("\"/>\n");
@@ -174,14 +178,14 @@ public class XMIExporterImpl implements XMIExporter {
                 // Extremo Origen
                 xml.append("        <ownedEnd xmi:type=\"uml:Property\" xmi:id=\"").append(endSrcId)
                    .append("\" type=\"").append(srcId).append("\" association=\"").append(rId).append("\">\n");
-                appendMultiplicityXml(xml, cardSrc, "SRC_" + rel.getId());
+                appendMultiplicityXml(xml, cardSrc, "SRC_" + (rel.getId() != null ? rel.getId() : System.identityHashCode(rel)));
                 xml.append("        </ownedEnd>\n");
 
                 // Extremo Destino (con agregación)
                 xml.append("        <ownedEnd xmi:type=\"uml:Property\" xmi:id=\"").append(endDstId)
                    .append("\" type=\"").append(dstId).append("\" association=\"").append(rId)
                    .append("\" aggregation=\"").append(aggregation).append("\">\n");
-                appendMultiplicityXml(xml, cardDst, "DST_" + rel.getId());
+                appendMultiplicityXml(xml, cardDst, "DST_" + (rel.getId() != null ? rel.getId() : System.identityHashCode(rel)));
                 xml.append("        </ownedEnd>\n");
 
                 xml.append("      </packagedElement>\n");
@@ -195,8 +199,10 @@ public class XMIExporterImpl implements XMIExporter {
         xml.append("  <xmi:Extension extender=\"Enterprise Architect\" extenderID=\"6.5\">\n");
         xml.append("    <elements>\n");
         for (ClaseUML c : clases) {
-            xml.append("      <element xmi:idref=\"EAID_").append(c.getId())
-               .append("\" xmi:type=\"uml:Class\" name=\"").append(escapeXml(c.getNombre()))
+            if (c == null) continue;
+            String cId = "EAID_" + (c.getId() != null ? c.getId() : System.identityHashCode(c));
+            xml.append("      <element xmi:idref=\"").append(cId)
+               .append("\" xmi:type=\"uml:Class\" name=\"").append(escapeXml(c.getNombre() != null ? c.getNombre() : "Clase"))
                .append("\" scope=\"").append(c.getVisibilidad() != null ? c.getVisibilidad().name().toLowerCase() : "public")
                .append("\"/>\n");
         }
@@ -204,15 +210,18 @@ public class XMIExporterImpl implements XMIExporter {
 
         xml.append("    <connectors>\n");
         for (RelacionUML r : relaciones) {
-            if (r.getClaseOrigen() == null || r.getClaseDestino() == null) continue;
-            String eaType = switch (r.getTipoRelacion()) {
+            if (r == null || r.getClaseOrigen() == null || r.getClaseDestino() == null ||
+                r.getClaseOrigen().getId() == null || r.getClaseDestino().getId() == null) continue;
+            TipoRelacionUML rTipo = r.getTipoRelacion() != null ? r.getTipoRelacion() : TipoRelacionUML.ASOCIACION;
+            String eaType = switch (rTipo) {
                 case HERENCIA -> "Generalization";
                 case AGREGACION -> "Aggregation";
                 case COMPOSICION -> "Composition";
                 case DEPENDENCIA -> "Dependency";
                 default -> "Association";
             };
-            xml.append("      <connector xmi:idref=\"EAID_REL_").append(r.getId()).append("\">\n");
+            String rId = "EAID_REL_" + (r.getId() != null ? r.getId() : System.identityHashCode(r));
+            xml.append("      <connector xmi:idref=\"").append(rId).append("\">\n");
             xml.append("        <source xmi:idref=\"EAID_").append(r.getClaseOrigen().getId()).append("\">\n");
             xml.append("          <type multiplicity=\"").append(escapeXml(r.getCardinalidadOrigen() != null ? r.getCardinalidadOrigen() : "1")).append("\"/>\n");
             xml.append("        </source>\n");
@@ -232,13 +241,15 @@ public class XMIExporterImpl implements XMIExporter {
         xml.append("        <elements>\n");
         int seq = 1;
         for (ClaseUML c : clases) {
+            if (c == null) continue;
+            long cId = c.getId() != null ? c.getId() : seq;
             int left = c.getPosicionX() != null ? c.getPosicionX().intValue() : (80 + (seq % 3) * 260);
             int top = c.getPosicionY() != null ? c.getPosicionY().intValue() : (80 + (seq / 3) * 200);
             int right = left + 160;
             int bottom = top + 110;
-            String style = String.format("DUID=D%d;left=%d;top=%d;right=%d;bottom=%d;", c.getId(), left, top, right, bottom);
+            String style = String.format("DUID=D%d;left=%d;top=%d;right=%d;bottom=%d;", cId, left, top, right, bottom);
 
-            xml.append("          <element subject=\"EAID_").append(c.getId())
+            xml.append("          <element subject=\"EAID_").append(cId)
                .append("\" seqno=\"").append(seq)
                .append("\" style=\"").append(style).append("\"/>\n");
             seq++;
