@@ -198,13 +198,26 @@ public class AIAgentServiceImpl implements AIAgentService {
     @Transactional
     public AICommandResponse procesarVoz(Long modeloId, VoiceCommandRequest request, String usuarioEmail) {
         String texto = request.getTextoTranscrito();
-        if (texto == null || texto.isBlank()) {
-            throw new ValidationException("No se proporcionó audio ni texto transcrito válido para el comando de voz.");
+
+        // Si no vino texto transcrito pero sí vino audioBase64, transcribir con Groq Whisper
+        if ((texto == null || texto.isBlank()) && request.getAudioBase64() != null && !request.getAudioBase64().isBlank()) {
+            log.info("Comando de voz recibido en audioBase64, transcribiendo con Groq Whisper...");
+            texto = aiCommandParser.transcribeAudioBase64(request.getAudioBase64());
         }
+
+        if (texto == null || texto.isBlank()) {
+            throw new ValidationException("No se pudo reconocer audio ni texto válido en el comando de voz.");
+        }
+
+        log.info("Comando de voz procesado como texto: '{}'", texto);
         AICommandRequest cmdRequest = AICommandRequest.builder()
                 .prompt(texto.trim())
                 .build();
-        return procesarComando(modeloId, cmdRequest, usuarioEmail);
+        AICommandResponse response = procesarComando(modeloId, cmdRequest, usuarioEmail);
+        if (response != null && response.getMensaje() != null) {
+            response.setMensaje("🎙️ Voz reconocida: \"" + texto + "\"\n" + response.getMensaje());
+        }
+        return response;
     }
 
     @Override

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../migrations/migration_manager.dart';
 
 class AppDatabase {
@@ -35,7 +36,7 @@ class AppDatabase {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    if (!inMemory && storagePath != null) {
+    if (!inMemory) {
       await _loadFromFile();
     }
 
@@ -48,43 +49,76 @@ class AppDatabase {
   }
 
   Future<void> _loadFromFile() async {
+    // 1. Intentar cargar desde SharedPreferences (almacenamiento persistente nativo en Android/iOS/Web)
     try {
-      final file = File(storagePath!);
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        if (content.trim().isNotEmpty) {
-          final decoded = jsonDecode(content);
-          if (decoded is Map) {
-            _schemaVersion = (decoded['_schemaVersion'] as num?)?.toInt() ?? 0;
-            final tables = decoded['tables'];
-            if (tables is Map) {
-              tables.forEach((key, val) {
-                if (val is List) {
-                  _tables[key.toString()] = List<Map<String, dynamic>>.from(
-                    val.map((item) => Map<String, dynamic>.from(item)),
-                  );
-                }
-              });
-            }
-          }
-        }
+      final prefs = await SharedPreferences.getInstance();
+      final content = prefs.getString('case_platform_offline_db');
+      if (content != null && content.trim().isNotEmpty) {
+        _parseAndPopulate(content);
+        return;
       }
     } catch (_) {
-      // Si falla lectura, se inicia con estado limpio
+      // Ignorar fallo de SharedPreferences y continuar al archivo
+    }
+
+    // 2. Fallback a archivo de disco (utilizado en pruebas de escritorio / consola)
+    if (storagePath != null) {
+      try {
+        final file = File(storagePath!);
+        if (await file.exists()) {
+          final content = await file.readAsString();
+          _parseAndPopulate(content);
+        }
+      } catch (_) {
+        // Si falla lectura, se inicia con estado limpio
+      }
     }
   }
 
-  Future<void> _persist() async {
-    if (inMemory || storagePath == null) return;
+  void _parseAndPopulate(String content) {
     try {
-      final file = File(storagePath!);
-      final data = {
-        '_schemaVersion': _schemaVersion,
-        'tables': _tables,
-      };
-      await file.writeAsString(jsonEncode(data), flush: true);
+      final decoded = jsonDecode(content);
+      if (decoded is Map) {
+        _schemaVersion = (decoded['_schemaVersion'] as num?)?.toInt() ?? 0;
+        final tables = decoded['tables'];
+        if (tables is Map) {
+          tables.forEach((key, val) {
+            if (val is List) {
+              _tables[key.toString()] = List<Map<String, dynamic>>.from(
+                val.map((item) => Map<String, dynamic>.from(item)),
+              );
+            }
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist() async {
+    if (inMemory) return;
+
+    final data = {
+      '_schemaVersion': _schemaVersion,
+      'tables': _tables,
+    };
+    final jsonString = jsonEncode(data);
+
+    // 1. Guardar de forma permanente en SharedPreferences (persiste entre cierres en Android)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('case_platform_offline_db', jsonString);
     } catch (_) {
-      // Ignorar fallos de I/O en entornos restringidos
+      // Ignorar fallos de SharedPreferences
+    }
+
+    // 2. Guardar también en archivo local si storagePath está especificado
+    if (storagePath != null) {
+      try {
+        final file = File(storagePath!);
+        await file.writeAsString(jsonString, flush: true);
+      } catch (_) {
+        // Ignorar fallos de I/O en entornos restringidos
+      }
     }
   }
 

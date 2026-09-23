@@ -52,8 +52,40 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
         boolean geminiAttempted = false;
         boolean geminiFailed = false;
 
-        // 1. PRIORIDAD MÁXIMA: Google Gemini Vision AI si hay API Key disponible
-        if (aiConfig != null && aiConfig.getGeminiApiKey() != null && !aiConfig.getGeminiApiKey().isBlank() && imageBytes != null) {
+        // 1. PRIORIDAD MÁXIMA: Groq AI para análisis semántico profundo si hay texto OCR
+        if (aiConfig != null && aiConfig.hasGroq() && ocrText != null && !ocrText.isBlank()) {
+            try {
+                ImageUMLDetectedDTO groqResult = detectWithGroqText(ocrText);
+                if (groqResult != null && groqResult.getClases() != null && !groqResult.getClases().isEmpty()) {
+                    groqResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
+                    applyAutoLayout(groqResult.getClases());
+                    log.info("Detección exitosa con Groq AI: {} clases, {} relaciones",
+                            groqResult.getClases().size(), groqResult.getRelaciones().size());
+                    return groqResult;
+                }
+            } catch (Exception e) {
+                log.warn("Fallo el análisis con Groq AI, recurriendo a motor local: {}", e.getMessage());
+            }
+        }
+
+        // 2. Prioridad: OpenAI Vision AI (GPT-4o) si hay API Key disponible
+        if (aiConfig != null && aiConfig.hasOpenAI() && imageBytes != null) {
+            try {
+                ImageUMLDetectedDTO resultAI = detectWithMultimodalAI(imageBytes);
+                if (resultAI != null && resultAI.getClases() != null && !resultAI.getClases().isEmpty()) {
+                    resultAI.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
+                    resultAI.setMotorUtilizado("OPENAI_VISION_AI");
+                    applyAutoLayout(resultAI.getClases());
+                    return resultAI;
+                }
+            } catch (Exception e) {
+                log.warn("Fallo o no respondió el servicio de Visión Multimodal ({}), recurriendo a motor local: {}",
+                        aiConfig.getModel(), e.getMessage());
+            }
+        }
+
+        // 3. Google Gemini Vision AI SOLO si Groq no está configurado y Gemini está explícitamente configurado
+        if (aiConfig != null && !aiConfig.hasGroq() && aiConfig.hasGemini() && imageBytes != null) {
             geminiAttempted = true;
             try {
                 ImageUMLDetectedDTO geminiResult = detectWithGeminiAI(imageBytes);
@@ -72,51 +104,40 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
             }
         }
 
-        // 2. Prioridad Secundaria: OpenAI Vision AI (GPT-4o) si hay API Key disponible
-        if (aiConfig != null && aiConfig.getApiKey() != null && !aiConfig.getApiKey().isBlank() && imageBytes != null) {
-            try {
-                ImageUMLDetectedDTO resultAI = detectWithMultimodalAI(imageBytes);
-                if (resultAI != null && resultAI.getClases() != null && !resultAI.getClases().isEmpty()) {
-                    resultAI.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
-                    resultAI.setMotorUtilizado("OPENAI_VISION_AI");
-                    applyAutoLayout(resultAI.getClases());
-                    return resultAI;
-                }
-            } catch (Exception e) {
-                log.warn("Fallo o no respondió el servicio de Visión Multimodal ({}), recurriendo a motor local: {}",
-                        aiConfig.getModel(), e.getMessage());
-            }
-        }
-
-        // 3. Si se recibió texto reconocido por OCR en frontend, parsearlo
+        // 4. Si se recibió texto reconocido por OCR en frontend, parsearlo
         if (ocrText != null && !ocrText.isBlank()) {
             ImageUMLDetectedDTO ocrResult = detectUMLFromText(ocrText);
             if (ocrResult != null && ocrResult.getClases() != null && !ocrResult.getClases().isEmpty()) {
                 ocrResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
-                ocrResult.setMotorUtilizado("TESSERACT_OCR_LOCAL_ENGINE");
+                if (ocrResult.getMotorUtilizado() == null || ocrResult.getMotorUtilizado().isBlank()) {
+                    ocrResult.setMotorUtilizado("TESSERACT_OCR_LOCAL_ENGINE");
+                }
                 ocrResult.setNivelConfianza(0.85);
                 applyAutoLayout(ocrResult.getClases());
-                if (geminiAttempted && geminiFailed) {
-                    ocrResult.getAdvertencias().add("Aviso: Google AI Studio reportó alta demanda temporal en sus servidores (503). Se utilizó reconocimiento OCR como respaldo. Puede volver a subir la imagen para reintentar con IA.");
-                }
                 return ocrResult;
             }
         }
 
-        // 4. Motor de Visión Computacional y Reconocimiento Estructural Local (Offline)
+        // 5. Motor de Visión Computacional y Reconocimiento Estructural Local (Offline)
         ImageUMLDetectedDTO localResult = detectWithLocalComputerVision(image, filename, ocrText);
         localResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
         localResult.setMotorUtilizado("COMPUTER_VISION_OCR_ENGINE");
         applyAutoLayout(localResult.getClases());
-        if (geminiAttempted && geminiFailed) {
-            localResult.getAdvertencias().add("Aviso: Los servidores de Google AI Studio experimentaron un pico temporal de demanda (HTTP 503). Se aplicó motor de visión local como respaldo.");
-        }
         return localResult;
     }
 
     @Override
     public ImageUMLDetectedDTO detectUMLFromText(String rawText) {
         long startTime = System.currentTimeMillis();
+        if (aiConfig != null && aiConfig.hasGroq()) {
+            ImageUMLDetectedDTO groqResult = detectWithGroqText(rawText);
+            if (groqResult != null && groqResult.getClases() != null && !groqResult.getClases().isEmpty()) {
+                groqResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
+                applyAutoLayout(groqResult.getClases());
+                return groqResult;
+            }
+        }
+
         List<ClaseDetectadaDTO> clases = textParser.parseClassesFromText(rawText);
         List<RelacionDetectadaDTO> relaciones = textParser.parseRelationsFromText(rawText);
         applyAutoLayout(clases);
@@ -206,6 +227,91 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
             return parseVisionJsonResponse(response.getBody());
         }
 
+        return null;
+    }
+
+    /**
+     * Detección y extracción estructurada de clases y relaciones UML con Groq Cloud AI.
+     */
+    private ImageUMLDetectedDTO detectWithGroqText(String text) {
+        if (text == null || text.isBlank() || aiConfig == null || !aiConfig.hasGroq()) {
+            return null;
+        }
+
+        String systemPrompt = """
+                Eres un experto en visión artificial, ingeniería de software y análisis de diagramas UML 2.5.
+                Analiza el siguiente texto descriptivo o extraído por OCR de un diagrama de clases UML.
+                Extrae minuciosamente TODAS las clases, atributos, visibilidades, tipos de datos, métodos, relaciones y cardinalidades.
+                
+                Debes responder EXCLUSIVAMENTE con un JSON válido con la siguiente estructura exacta:
+                {
+                  "clases": [
+                    {
+                      "nombre": "NombreClase",
+                      "visibilidad": "PUBLIC",
+                      "descripcion": "Descripción opcional",
+                      "atributos": [
+                        { "nombre": "id", "tipoDato": "Long", "visibilidad": "PRIVATE", "valorInicial": null },
+                        { "nombre": "nombre", "tipoDato": "String", "visibilidad": "PRIVATE", "valorInicial": null }
+                      ],
+                      "metodos": [
+                        { "nombre": "calcularTotal", "tipoRetorno": "Double", "visibilidad": "PUBLIC", "parametros": null }
+                      ]
+                    }
+                  ],
+                  "relaciones": [
+                    {
+                      "claseOrigen": "Cliente",
+                      "claseDestino": "Venta",
+                      "tipoRelacion": "ASOCIACION",
+                      "cardinalidadOrigen": "1",
+                      "cardinalidadDestino": "*",
+                      "descripcion": null
+                    }
+                  ]
+                }
+                
+                Reglas:
+                - Visibilidad permitida: PUBLIC, PRIVATE, PROTECTED, PACKAGE.
+                - Tipo de relación permitida: ASOCIACION, HERENCIA, AGREGACION, COMPOSICION, DEPENDENCIA.
+                - Cardinalidades permitidas: "1", "0..1", "*", "1..*", "0..*".
+                - Tipos de datos normalizados: String, Integer, Long, Double, Boolean, LocalDate, LocalDateTime, etc.
+                - Si no se especifica cardinalidad, asumir "1" y "*".
+                - No agregues texto ni explicaciones fuera del bloque JSON.
+                """;
+
+        String modelToUse = (aiConfig.getGroqModel() != null && !aiConfig.getGroqModel().isBlank())
+                ? aiConfig.getGroqModel()
+                : "openai/gpt-oss-120b";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(aiConfig.getGroqApiKey().trim());
+
+        Map<String, Object> body = Map.of(
+                "model", modelToUse,
+                "messages", List.of(
+                        Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "user", "content", "Texto del diagrama UML:\\n" + text)
+                ),
+                "temperature", 0.0,
+                "response_format", Map.of("type", "json_object")
+        );
+
+        String baseUrl = (aiConfig.getGroqBaseUrl() != null && !aiConfig.getGroqBaseUrl().isBlank())
+                ? aiConfig.getGroqBaseUrl()
+                : "https://api.groq.com/openai/v1";
+        String url = baseUrl.replaceAll("/+$", "") + "/chat/completions";
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return parseGroqJsonResponse(response.getBody(), modelToUse);
+            }
+        } catch (Exception e) {
+            log.warn("Fallo el análisis con Groq AI: {}", e.getMessage());
+        }
         return null;
     }
 
@@ -410,6 +516,23 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
             }
         } catch (Exception e) {
             log.error("Error al procesar el JSON devuelto por visión artificial de OpenAI: {}", e.getMessage(), e);
+        }
+        return null;
+    }
+
+    /**
+     * Parsea la respuesta JSON devuelta por Groq Cloud AI.
+     */
+    private ImageUMLDetectedDTO parseGroqJsonResponse(String responseBody, String model) {
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode choices = root.path("choices");
+            if (choices.isArray() && !choices.isEmpty()) {
+                String content = choices.get(0).path("message").path("content").asText();
+                return parseUmlJsonContent(content, "GROQ_AI (" + model + ")");
+            }
+        } catch (Exception e) {
+            log.error("Error al procesar el JSON devuelto por Groq AI: {}", e.getMessage());
         }
         return null;
     }

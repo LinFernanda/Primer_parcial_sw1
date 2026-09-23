@@ -65,7 +65,11 @@ public class EntityGeneratorServiceImpl implements EntityGeneratorService {
                     if (rel.getMappedBy() != null && !rel.getMappedBy().isBlank()) {
                         sb.append("mappedBy = \"").append(rel.getMappedBy()).append("\", ");
                     }
-                    sb.append("cascade = ").append(rel.getCascadeType() != null ? rel.getCascadeType() : "CascadeType.ALL");
+                    String cascadeOneToMany = rel.getCascadeType() != null ? rel.getCascadeType() : "CascadeType.ALL";
+                    if (cascadeOneToMany.contains(",") && !cascadeOneToMany.startsWith("{")) {
+                        cascadeOneToMany = "{" + cascadeOneToMany + "}";
+                    }
+                    sb.append("cascade = ").append(cascadeOneToMany);
                     if (rel.isOrphanRemoval()) {
                         sb.append(", orphanRemoval = true");
                     }
@@ -88,7 +92,11 @@ public class EntityGeneratorServiceImpl implements EntityGeneratorService {
                     if (rel.getMappedBy() != null && !rel.getMappedBy().isBlank()) {
                         sb.append("mappedBy = \"").append(rel.getMappedBy()).append("\"");
                     } else {
-                        sb.append("cascade = CascadeType.ALL");
+                        String cascadeOneToOne = rel.getCascadeType() != null ? rel.getCascadeType() : "CascadeType.ALL";
+                        if (cascadeOneToOne.contains(",") && !cascadeOneToOne.startsWith("{")) {
+                            cascadeOneToOne = "{" + cascadeOneToOne + "}";
+                        }
+                        sb.append("cascade = ").append(cascadeOneToOne);
                     }
                     sb.append(")\n");
                     if (rel.getJoinColumnName() != null && !rel.getJoinColumnName().isBlank()) {

@@ -137,9 +137,72 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
     }
   };
 
+  const enviarComandoAudio = async (audioBase64: string) => {
+    if (!audioBase64 || isProcessing) return;
+
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      remitente: 'user',
+      texto: '🎙️ [Comando de voz enviado - transcribiendo...]',
+      fecha: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setIsProcessing(true);
+
+    try {
+      const res: AICommandResponse = await aiService.enviarVoz(modeloId, '', audioBase64);
+
+      if (res.mensaje && res.mensaje.includes('🎙️ Voz reconocida:')) {
+        const lineas = res.mensaje.split('\n');
+        const vozText = lineas[0].replace('🎙️ Voz reconocida: ', '').replace(/"/g, '');
+        setMessages((prev) =>
+          prev.map((m) => (m.id === userMsg.id ? { ...m, texto: `🎙️ "${vozText}"` } : m))
+        );
+      }
+
+      const assistantMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        remitente: 'assistant',
+        texto: res.mensaje || res.message || '',
+        fecha: res.fecha || new Date().toISOString(),
+        requiereConfirmacion: res.requiereConfirmacion ?? res.confirmationRequired,
+        accionPendiente: (res.requiereConfirmacion ?? res.confirmationRequired) ? (res.accion || res.parsedAction) : undefined,
+        accionEjecutada: !(res.requiereConfirmacion ?? res.confirmationRequired) ? (res.accion || res.parsedAction) : undefined,
+        esExitoso: res.exitoso ?? res.success,
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      if (res.modeloActualizado && !res.requiereConfirmacion) {
+        onModelUpdated(res.modeloActualizado);
+      }
+
+      await cargarHistorial();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || err.message || 'Error al procesar el audio por voz.';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          remitente: 'assistant',
+          texto: `⚠️ ${errorMsg}`,
+          fecha: new Date().toISOString(),
+          esExitoso: false,
+        },
+      ]);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleVoiceTranscript = (textoDictado: string) => {
     setInputPrompt(textoDictado);
     enviarComandoTexto(textoDictado);
+  };
+
+  const handleVoiceAudio = (audioBase64: string) => {
+    enviarComandoAudio(audioBase64);
   };
 
   const handleConfirmAction = (accion: ParsedAIAction) => {
@@ -441,7 +504,11 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
           gap: '6px',
         }}
       >
-        <VoiceButton onTranscript={handleVoiceTranscript} disabled={isProcessing} />
+        <VoiceButton
+          onTranscript={handleVoiceTranscript}
+          onAudioRecorded={handleVoiceAudio}
+          disabled={isProcessing}
+        />
 
         <input
           type="text"

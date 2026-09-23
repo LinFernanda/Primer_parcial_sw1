@@ -8,6 +8,15 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AIConfig {
 
+    @Value("${ai.groq.api-key:}")
+    private String groqApiKey;
+
+    @Value("${ai.groq.model:openai/gpt-oss-120b}")
+    private String groqModel = "openai/gpt-oss-120b";
+
+    @Value("${ai.groq.base-url:https://api.groq.com/openai/v1}")
+    private String groqBaseUrl = "https://api.groq.com/openai/v1";
+
     @Value("${ai.openai.api-key:}")
     private String apiKey;
 
@@ -22,4 +31,16 @@ public class AIConfig {
 
     @Value("${ai.gemini.model:gemini-flash-lite-latest}")
     private String geminiModel = "gemini-flash-lite-latest";
+
+    public boolean hasGroq() {
+        return groqApiKey != null && !groqApiKey.isBlank();
+    }
+
+    public boolean hasGemini() {
+        return geminiApiKey != null && !geminiApiKey.isBlank();
+    }
+
+    public boolean hasOpenAI() {
+        return apiKey != null && !apiKey.isBlank();
+    }
 }

@@ -59,7 +59,7 @@ public class UMLAnalyzerServiceImpl implements UMLAnalyzerService {
                 GeneratedEntityModel target = entityMap.get(relacion.getClaseDestino() != null ? relacion.getClaseDestino().getId() : null);
 
                 if (origin != null && target != null) {
-                    analyzeRelation(relacion, origin, target);
+                    analyzeRelation(relacion, origin, target, project);
                 }
             }
         }
@@ -150,7 +150,7 @@ public class UMLAnalyzerServiceImpl implements UMLAnalyzerService {
                 .build();
     }
 
-    private void analyzeRelation(RelacionUML relacion, GeneratedEntityModel origin, GeneratedEntityModel target) {
+    private void analyzeRelation(RelacionUML relacion, GeneratedEntityModel origin, GeneratedEntityModel target, GeneratedProjectModel project) {
         TipoRelacionUML tipo = relacion.getTipoRelacion() != null ? relacion.getTipoRelacion() : TipoRelacionUML.ASOCIACION;
 
         // Herencia
@@ -226,24 +226,101 @@ public class UMLAnalyzerServiceImpl implements UMLAnalyzerService {
 
         } else if (originIsMany && targetIsMany) {
             // Muchos a Muchos (Origin * ---- * Target)
-            origin.getRelations().add(GeneratedRelationModel.builder()
-                    .tipoRelacionJPA(TipoRelacionJPA.MANY_TO_MANY)
-                    .fieldName(targetVarName + "List")
-                    .targetEntity(target.getName())
-                    .cardinalidadOrigen(cardOrigen)
-                    .cardinalidadDestino(cardDestino)
-                    .descripcion(relacion.getDescripcion())
-                    .build());
+            // Se descompone en dos relaciones 1 a N mediante una entidad intermedia dedicada.
+            String intermediateName = origin.getName() + target.getName();
+            GeneratedEntityModel intermediateEntity = project.getEntities().stream()
+                    .filter(e -> e.getName().equalsIgnoreCase(intermediateName)
+                              || e.getName().equalsIgnoreCase(target.getName() + origin.getName()))
+                    .findFirst()
+                    .orElse(null);
 
-            target.getRelations().add(GeneratedRelationModel.builder()
-                    .tipoRelacionJPA(TipoRelacionJPA.MANY_TO_MANY)
-                    .fieldName(originVarName + "List")
-                    .targetEntity(origin.getName())
-                    .mappedBy(targetVarName + "List")
-                    .cardinalidadOrigen(cardOrigen)
-                    .cardinalidadDestino(cardDestino)
-                    .descripcion(relacion.getDescripcion())
-                    .build());
+            if (intermediateEntity == null) {
+                String intermediateTableName = toSnakeCase(origin.getName()) + "_" + toSnakeCase(target.getName());
+
+                GeneratedFieldModel defaultId = GeneratedFieldModel.builder()
+                        .name("id")
+                        .javaType("Long")
+                        .umlType("Long")
+                        .columnName("id")
+                        .isId(true)
+                        .isGenerated(true)
+                        .nullable(false)
+                        .unique(true)
+                        .build();
+
+                intermediateEntity = GeneratedEntityModel.builder()
+                        .name(intermediateName)
+                        .tableName(intermediateTableName)
+                        .description("Entidad intermedia para la relación muchos a muchos entre " + origin.getName() + " y " + target.getName())
+                        .primaryKeyName("id")
+                        .primaryKeyType("Long")
+                        .fields(new ArrayList<>(List.of(defaultId)))
+                        .relations(new ArrayList<>())
+                        .methods(new ArrayList<>())
+                        .build();
+
+                // Clave foránea hacia Origin (@ManyToOne)
+                intermediateEntity.getRelations().add(GeneratedRelationModel.builder()
+                        .tipoRelacionJPA(TipoRelacionJPA.MANY_TO_ONE)
+                        .fieldName(originVarName)
+                        .targetEntity(origin.getName())
+                        .joinColumnName(toSnakeCase(originVarName) + "_id")
+                        .fetchType("FetchType.LAZY")
+                        .cardinalidadOrigen("*")
+                        .cardinalidadDestino("1")
+                        .descripcion("Referencia a " + origin.getName())
+                        .build());
+
+                // Clave foránea hacia Target (@ManyToOne)
+                intermediateEntity.getRelations().add(GeneratedRelationModel.builder()
+                        .tipoRelacionJPA(TipoRelacionJPA.MANY_TO_ONE)
+                        .fieldName(targetVarName)
+                        .targetEntity(target.getName())
+                        .joinColumnName(toSnakeCase(targetVarName) + "_id")
+                        .fetchType("FetchType.LAZY")
+                        .cardinalidadOrigen("*")
+                        .cardinalidadDestino("1")
+                        .descripcion("Referencia a " + target.getName())
+                        .build());
+
+                project.getEntities().add(intermediateEntity);
+            }
+
+            // En Origin: @OneToMany apuntando a la entidad intermedia
+            final String finalIntermediateName = intermediateEntity.getName();
+            String intermediateVarName = cleanCamelCase(finalIntermediateName);
+            boolean originAlreadyHasRel = origin.getRelations().stream()
+                    .anyMatch(r -> r.getTargetEntity().equalsIgnoreCase(finalIntermediateName));
+            if (!originAlreadyHasRel) {
+                origin.getRelations().add(GeneratedRelationModel.builder()
+                        .tipoRelacionJPA(TipoRelacionJPA.ONE_TO_MANY)
+                        .fieldName(intermediateVarName + "List")
+                        .targetEntity(finalIntermediateName)
+                        .mappedBy(originVarName)
+                        .cascadeType("CascadeType.ALL")
+                        .orphanRemoval(true)
+                        .cardinalidadOrigen("1")
+                        .cardinalidadDestino("*")
+                        .descripcion("Relación con tabla intermedia " + finalIntermediateName)
+                        .build());
+            }
+
+            // En Target: @OneToMany apuntando a la entidad intermedia
+            boolean targetAlreadyHasRel = target.getRelations().stream()
+                    .anyMatch(r -> r.getTargetEntity().equalsIgnoreCase(finalIntermediateName));
+            if (!targetAlreadyHasRel) {
+                target.getRelations().add(GeneratedRelationModel.builder()
+                        .tipoRelacionJPA(TipoRelacionJPA.ONE_TO_MANY)
+                        .fieldName(intermediateVarName + "List")
+                        .targetEntity(finalIntermediateName)
+                        .mappedBy(targetVarName)
+                        .cascadeType("CascadeType.ALL")
+                        .orphanRemoval(true)
+                        .cardinalidadOrigen("1")
+                        .cardinalidadDestino("*")
+                        .descripcion("Relación con tabla intermedia " + finalIntermediateName)
+                        .build());
+            }
 
         } else {
             // Uno a Uno (Origin 1 ---- 1 Target)

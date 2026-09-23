@@ -115,7 +115,7 @@ class UMLAnalyzerServiceTest {
     }
 
     @Test
-    @DisplayName("Debe interpretar cardinalidad * a * como @ManyToMany")
+    @DisplayName("Debe descomponer cardinalidad * a * creando entidad intermedia y relaciones @OneToMany/@ManyToOne")
     void testAnalyzeManyToManyRelationship() {
         ClaseUML estudiante = ClaseUML.builder().id(1L).nombre("Estudiante").atributos(new ArrayList<>()).build();
         ClaseUML curso = ClaseUML.builder().id(2L).nombre("Curso").atributos(new ArrayList<>()).build();
@@ -138,11 +138,39 @@ class UMLAnalyzerServiceTest {
 
         GeneratedProjectModel project = umlAnalyzerService.analyze(modelo, null);
 
+        // 1. Debe haber 3 entidades: Estudiante, Curso y la entidad intermedia EstudianteCurso
+        assertEquals(3, project.getEntities().size());
+
+        GeneratedEntityModel intermediateEntity = project.getEntities().stream()
+                .filter(e -> "EstudianteCurso".equals(e.getName())).findFirst().orElseThrow();
+
+        assertEquals("estudiante_curso", intermediateEntity.getTableName());
+        assertEquals("id", intermediateEntity.getPrimaryKeyName());
+
+        // 2. La entidad intermedia debe tener dos relaciones @ManyToOne hacia Estudiante y Curso
+        assertTrue(intermediateEntity.getRelations().stream()
+                .anyMatch(r -> r.getTipoRelacionJPA() == TipoRelacionJPA.MANY_TO_ONE
+                        && "Estudiante".equals(r.getTargetEntity())
+                        && "estudiante_id".equals(r.getJoinColumnName())));
+
+        assertTrue(intermediateEntity.getRelations().stream()
+                .anyMatch(r -> r.getTipoRelacionJPA() == TipoRelacionJPA.MANY_TO_ONE
+                        && "Curso".equals(r.getTargetEntity())
+                        && "curso_id".equals(r.getJoinColumnName())));
+
+        // 3. Estudiante debe tener @OneToMany hacia EstudianteCurso
         GeneratedEntityModel estEntity = project.getEntities().stream()
                 .filter(e -> "Estudiante".equals(e.getName())).findFirst().orElseThrow();
-
         assertTrue(estEntity.getRelations().stream()
-                .anyMatch(r -> r.getTipoRelacionJPA() == TipoRelacionJPA.MANY_TO_MANY && "Curso".equals(r.getTargetEntity())));
+                .anyMatch(r -> r.getTipoRelacionJPA() == TipoRelacionJPA.ONE_TO_MANY
+                        && "EstudianteCurso".equals(r.getTargetEntity())));
+
+        // 4. Curso debe tener @OneToMany hacia EstudianteCurso
+        GeneratedEntityModel curEntity = project.getEntities().stream()
+                .filter(e -> "Curso".equals(e.getName())).findFirst().orElseThrow();
+        assertTrue(curEntity.getRelations().stream()
+                .anyMatch(r -> r.getTipoRelacionJPA() == TipoRelacionJPA.ONE_TO_MANY
+                        && "EstudianteCurso".equals(r.getTargetEntity())));
     }
 
     private GeneratedFieldModel findField(GeneratedEntityModel entity, String name) {

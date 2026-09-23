@@ -15,10 +15,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 /**
  * Intérprete semántico de lenguaje natural a acciones UML estructuradas.
@@ -47,20 +51,21 @@ public class AICommandParser {
 
         String promptLimpio = prompt.trim();
 
-        // 1. Si la API Key de Google Gemini está configurada, intentar orquestación con Gemini LLM
-        if (aiConfig.getGeminiApiKey() != null && !aiConfig.getGeminiApiKey().isBlank()) {
+        // 1. PRIORIDAD MÁXIMA: Si la API Key de Groq AI está configurada, orquestar con Groq LLM
+        if (aiConfig.hasGroq()) {
             try {
-                ParsedAIAction geminiResult = parseWithGemini(promptLimpio);
-                if (geminiResult != null && geminiResult.getTipoOperacion() != TipoOperacionAI.UNKNOWN) {
-                    return geminiResult;
+                ParsedAIAction groqResult = parseWithGroq(promptLimpio);
+                if (groqResult != null && groqResult.getTipoOperacion() != TipoOperacionAI.UNKNOWN) {
+                    return groqResult;
                 }
             } catch (Exception e) {
-                log.warn("Fallo la llamada a Gemini LLM, recurriendo a motor local: {}", e.getMessage());
+                log.warn("Fallo la llamada a Groq LLM ({}), recurriendo a motor local: {}",
+                        aiConfig.getGroqModel(), e.getMessage());
             }
         }
 
-        // 2. Si la API Key de OpenAI / LLM está configurada, intentar orquestación con OpenAI
-        if (aiConfig.getApiKey() != null && !aiConfig.getApiKey().isBlank()) {
+        // 2. Si la API Key de OpenAI / LLM está configurada (y no se usó Groq)
+        if (aiConfig.hasOpenAI()) {
             try {
                 ParsedAIAction llmResult = parseWithLLM(promptLimpio);
                 if (llmResult != null && llmResult.getTipoOperacion() != TipoOperacionAI.UNKNOWN) {
@@ -72,8 +77,169 @@ public class AICommandParser {
             }
         }
 
-        // 3. Motor NLP semántico determinístico local (español e inglés)
+        // 3. Si no hay Groq ni OpenAI y Gemini está explícitamente configurado
+        if (!aiConfig.hasGroq() && aiConfig.hasGemini()) {
+            try {
+                ParsedAIAction geminiResult = parseWithGemini(promptLimpio);
+                if (geminiResult != null && geminiResult.getTipoOperacion() != TipoOperacionAI.UNKNOWN) {
+                    return geminiResult;
+                }
+            } catch (Exception e) {
+                log.warn("Fallo la llamada a Gemini LLM, recurriendo a motor local: {}", e.getMessage());
+            }
+        }
+
+        // 4. Motor NLP semántico determinístico local (español e inglés)
         return parseWithRuleEngine(promptLimpio);
+    }
+
+    /**
+     * Interpretación asistida por Groq Cloud AI (OpenAI compatible endpoint de ultrabaja latencia).
+     */
+    private ParsedAIAction parseWithGroq(String prompt) {
+        String systemPrompt = """
+                Eres un asistente experto en ingeniería de software y modelado conceptual UML 2.5.
+                Tu función exclusiva es interpretar comandos del usuario en lenguaje natural y convertirlos
+                en una acción JSON estructurada para manipular el diagrama UML existente.
+                
+                IMPORTANTE: NO debes generar sistemas completos desde cero. Solo traduce la orden directa del usuario.
+                
+                Responde ÚNICAMENTE con un JSON válido con la siguiente estructura:
+                {
+                  "tipoOperacion": "CREATE_CLASS | UPDATE_CLASS | DELETE_CLASS | CREATE_ATTRIBUTE | UPDATE_ATTRIBUTE | DELETE_ATTRIBUTE | CREATE_RELATION | UPDATE_RELATION | DELETE_RELATION | CONFIRMATION_REQUIRED | UNKNOWN",
+                  "nombreClase": "Nombre de clase o null",
+                  "nuevoNombreClase": "Nuevo nombre si es rename o null",
+                  "nombreAtributo": "Nombre de atributo o null",
+                  "nuevoNombreAtributo": "Nuevo nombre si es rename o null",
+                  "tipoDatoAtributo": "String, Integer, Double, Boolean, Long, etc.",
+                  "visibilidad": "PUBLIC, PRIVATE, PROTECTED, PACKAGE",
+                  "claseOrigen": "Clase origen de relación o null",
+                  "claseDestino": "Clase destino de relación o null",
+                  "tipoRelacion": "ASOCIACION, HERENCIA, AGREGACION, COMPOSICION, DEPENDENCIA",
+                  "cardinalidadOrigen": "1, 0..1, *, 1..*",
+                  "cardinalidadDestino": "1, 0..1, *, 1..*",
+                  "descripcion": "Descripción o null",
+                  "requiereConfirmacion": false,
+                  "preguntaConfirmacion": null,
+                  "atributos": [
+                    {"nombre": "campo", "tipo": "String", "visibilidad": "PRIVATE"}
+                  ],
+                  "explicacion": "Breve confirmación de la acción interpretada"
+                }
+                
+                Si la orden es ambigua (ej. 'Crear cliente' sin especificar si es clase), establece tipoOperacion en 'CONFIRMATION_REQUIRED', requiereConfirmacion en true y formula preguntaConfirmacion.
+                """;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(aiConfig.getGroqApiKey().trim());
+
+        String modelToUse = (aiConfig.getGroqModel() != null && !aiConfig.getGroqModel().isBlank())
+                ? aiConfig.getGroqModel()
+                : "openai/gpt-oss-120b";
+
+        Map<String, Object> body = Map.of(
+                "model", modelToUse,
+                "messages", List.of(
+                        Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "user", "content", prompt)
+                ),
+                "temperature", 0.0,
+                "response_format", Map.of("type", "json_object")
+        );
+
+        String baseUrl = (aiConfig.getGroqBaseUrl() != null && !aiConfig.getGroqBaseUrl().isBlank())
+                ? aiConfig.getGroqBaseUrl()
+                : "https://api.groq.com/openai/v1";
+        String url = baseUrl.replaceAll("/+$", "") + "/chat/completions";
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            try {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                String content = root.path("choices").get(0).path("message").path("content").asText();
+                log.info("Comando interpretado exitosamente con Groq AI (modelo: '{}')", modelToUse);
+                return objectMapper.readValue(content, ParsedAIAction.class);
+            } catch (Exception e) {
+                log.error("Error al parsear respuesta JSON de Groq AI: {}", e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Transcribe un audio codificado en Base64 utilizando Groq Whisper (whisper-large-v3-turbo).
+     */
+    public String transcribeAudioBase64(String audioBase64) {
+        if (audioBase64 == null || audioBase64.isBlank() || !aiConfig.hasGroq()) {
+            return null;
+        }
+
+        try {
+            String cleanBase64 = audioBase64;
+            String extension = "webm";
+            if (cleanBase64.contains(",")) {
+                String header = cleanBase64.substring(0, cleanBase64.indexOf(","));
+                if (header.contains("wav")) extension = "wav";
+                else if (header.contains("mp3")) extension = "mp3";
+                else if (header.contains("ogg")) extension = "ogg";
+                cleanBase64 = cleanBase64.substring(cleanBase64.indexOf(",") + 1);
+            }
+            byte[] audioBytes = Base64.getDecoder().decode(cleanBase64.trim());
+            return transcribeAudio(audioBytes, "voice_input." + extension);
+        } catch (Exception e) {
+            log.error("Error al decodificar audioBase64 para transcripción: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Transcribe bytes de audio utilizando la API de Groq Whisper (/audio/transcriptions).
+     */
+    public String transcribeAudio(byte[] audioBytes, String filename) {
+        if (audioBytes == null || audioBytes.length == 0 || !aiConfig.hasGroq()) {
+            return null;
+        }
+
+        try {
+            String baseUrl = (aiConfig.getGroqBaseUrl() != null && !aiConfig.getGroqBaseUrl().isBlank())
+                    ? aiConfig.getGroqBaseUrl()
+                    : "https://api.groq.com/openai/v1";
+            String url = baseUrl.replaceAll("/+$", "") + "/audio/transcriptions";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            headers.setBearerAuth(aiConfig.getGroqApiKey().trim());
+
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+
+            final String actualFilename = (filename != null && !filename.isBlank()) ? filename : "audio.webm";
+            ByteArrayResource resource = new ByteArrayResource(audioBytes) {
+                @Override
+                public String getFilename() {
+                    return actualFilename;
+                }
+            };
+
+            body.add("file", resource);
+            body.add("model", "whisper-large-v3-turbo");
+            body.add("language", "es");
+            body.add("response_format", "json");
+
+            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, requestEntity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                String transcribedText = root.path("text").asText();
+                log.info("Audio transcrito exitosamente con Groq Whisper: '{}'", transcribedText);
+                return transcribedText;
+            }
+        } catch (Exception e) {
+            log.error("Error al transcribir audio con Groq Whisper: {}", e.getMessage());
+        }
+        return null;
     }
 
     /**

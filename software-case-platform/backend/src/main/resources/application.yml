@@ -50,8 +50,12 @@ logging:
     org.hibernate.SQL: WARN
 
 ai:
+  groq:
+    api-key: ${GROQ_API_KEY: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}
+    model: ${GROQ_MODEL:openai/gpt-oss-120b}
+    base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
   gemini:
-    api-key: ${GEMINI_API_KEY:${AI_GEMINI_API_KEY:AQ.Ab8RN6LUxPsNNeqTYleCHJPtEsW61yoNjAwNFvaTiGcrT6ZssA}}
+    api-key: ${GEMINI_API_KEY:${AI_GEMINI_API_KEY:}}
     model: ${GEMINI_MODEL:gemini-flash-lite-latest}
   openai:
     api-key: ${AI_OPENAI_API_KEY:${OPENAI_API_KEY:}}

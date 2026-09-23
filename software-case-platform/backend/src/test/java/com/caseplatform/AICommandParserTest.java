@@ -145,4 +145,20 @@ class AICommandParserTest {
         assertEquals(TipoOperacionAI.UNKNOWN, action.getTipoOperacion());
         assertTrue(action.getExplicacion().contains("No genera sistemas completos desde cero"));
     }
+
+    @Test
+    @DisplayName("Debe orquestar con Groq AI cuando la API Key está configurada")
+    void testParseWithGroqAI() {
+        AIConfig groqConfig = new AIConfig();
+        groqConfig.setGroqApiKey("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");
+        groqConfig.setGroqModel("openai/gpt-oss-120b");
+        groqConfig.setGroqBaseUrl("https://api.groq.com/openai/v1");
+
+        AICommandParser groqParser = new AICommandParser(groqConfig, new ObjectMapper());
+        ParsedAIAction action = groqParser.parse("crear clase Producto con atributo precio Double");
+
+        assertNotNull(action);
+        assertEquals(TipoOperacionAI.CREATE_CLASS, action.getTipoOperacion());
+        assertEquals("Producto", action.getNombreClase());
+    }
 }
