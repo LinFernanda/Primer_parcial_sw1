@@ -86,7 +86,7 @@ export const ProjectsPage: React.FC = () => {
             Proyectos de Modelado UML 2.5
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '14px', marginTop: '4px' }}>
-            Pizarra colaborativa para diseño de arquitectura conceptual y generación de software
+            Espacio colaborativo: Administradores y Arquitectos comparten y editan los mismos proyectos en tiempo real
           </p>
         </div>
 
@@ -107,7 +107,7 @@ export const ProjectsPage: React.FC = () => {
         {/* Lista de Proyectos Existentes */}
         <div>
           <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#f8fafc', marginBottom: '16px' }}>
-            Tus Proyectos Activos ({proyectos.length})
+            Proyectos Compartidos ({proyectos.length})
           </h2>
 
           {loading ? (
@@ -154,9 +154,16 @@ export const ProjectsPage: React.FC = () => {
                         {p.descripcion}
                       </p>
                     )}
-                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'inline-block' }}>
-                      Modelos disponibles: {p.modelos?.length || 1}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>
+                        Modelos disponibles: {p.modelos?.length || 1}
+                      </span>
+                      {p.usuarioPropietarioEmail && (
+                        <span style={{ fontSize: '11px', color: '#38bdf8', background: '#0f172a', padding: '1px 8px', borderRadius: '4px', border: '1px solid #334155' }}>
+                          👤 Creado por: {p.usuarioPropietarioEmail}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

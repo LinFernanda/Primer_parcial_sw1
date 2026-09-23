@@ -68,13 +68,11 @@ public class ProyectoUMLServiceImpl implements ProyectoUMLService {
     @Override
     @Transactional(readOnly = true)
     public List<ProyectoUMLDTO> listarProyectos(String usuarioEmail) {
-        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(usuarioEmail.trim()).orElse(null);
-        if (usuario != null && usuario.getRol() == Rol.ADMIN) {
-            return proyectoUMLRepository.findAll().stream()
-                    .map(this::mapToDTO)
-                    .collect(Collectors.toList());
-        }
-        return proyectoUMLRepository.findByUsuarioPropietarioEmailIgnoreCase(usuarioEmail.trim()).stream()
+        log.info("Listando proyectos colaborativos para el usuario: {}", usuarioEmail);
+        // Administrador y Arquitecto (así como Ingeniero de Software) tienen acceso
+        // colaborativo completo a los mismos proyectos. Cuando uno crea un proyecto,
+        // al otro le aparece inmediatamente para visualizarlo y editarlo.
+        return proyectoUMLRepository.findAll().stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }

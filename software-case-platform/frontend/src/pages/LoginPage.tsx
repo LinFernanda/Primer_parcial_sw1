@@ -10,7 +10,7 @@ export const LoginPage: React.FC = () => {
   const [nombreCompleto, setNombreCompleto] = useState('');
   const [email, setEmail] = useState('admin@caseplatform.com');
   const [password, setPassword] = useState('Admin123*');
-  const [rol, setRol] = useState<'ADMIN' | 'INGENIERO'>('INGENIERO');
+  const [rol, setRol] = useState<'ADMIN' | 'INGENIERO' | 'ARQUITECTO'>('ARQUITECTO');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,9 +114,10 @@ export const LoginPage: React.FC = () => {
               <select
                 className="uml-field-select"
                 value={rol}
-                onChange={(e) => setRol(e.target.value as 'ADMIN' | 'INGENIERO')}
+                onChange={(e) => setRol(e.target.value as 'ADMIN' | 'INGENIERO' | 'ARQUITECTO')}
               >
-                <option value="INGENIERO">INGENIERO (Modelado y Diseño UML)</option>
+                <option value="ARQUITECTO">ARQUITECTO (Diseño y Modelado UML)</option>
+                <option value="INGENIERO">INGENIERO (Desarrollo y Modelado UML)</option>
                 <option value="ADMIN">ADMIN (Administración General)</option>
               </select>
             </div>
@@ -137,11 +138,11 @@ export const LoginPage: React.FC = () => {
             <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', fontWeight: 600 }}>
               Credenciales de prueba preconfiguradas:
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
               <button
                 type="button"
                 className="uml-toolbar-btn"
-                style={{ fontSize: '12px', justifyContent: 'center', padding: '6px' }}
+                style={{ fontSize: '11px', justifyContent: 'center', padding: '6px 4px' }}
                 onClick={() => {
                   setEmail('admin@caseplatform.com');
                   setPassword('Admin123*');
@@ -152,7 +153,18 @@ export const LoginPage: React.FC = () => {
               <button
                 type="button"
                 className="uml-toolbar-btn"
-                style={{ fontSize: '12px', justifyContent: 'center', padding: '6px' }}
+                style={{ fontSize: '11px', justifyContent: 'center', padding: '6px 4px' }}
+                onClick={() => {
+                  setEmail('arquitecto@caseplatform.com');
+                  setPassword('Arquitecto123*');
+                }}
+              >
+                🏗️ Arquitecto
+              </button>
+              <button
+                type="button"
+                className="uml-toolbar-btn"
+                style={{ fontSize: '11px', justifyContent: 'center', padding: '6px 4px' }}
                 onClick={() => {
                   setEmail('ingeniero@caseplatform.com');
                   setPassword('Ingeniero123*');

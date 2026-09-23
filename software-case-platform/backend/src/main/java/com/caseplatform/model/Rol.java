@@ -7,5 +7,6 @@ package com.caseplatform.model;
  */
 public enum Rol {
     ADMIN,
+    ARQUITECTO,
     INGENIERO
 }

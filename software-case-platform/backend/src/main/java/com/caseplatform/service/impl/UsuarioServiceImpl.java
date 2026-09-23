@@ -105,6 +105,22 @@ public class UsuarioServiceImpl implements UsuarioService {
                 ing.setPassword(passwordEncoder.encode(pass));
                 usuarioRepository.save(ing);
             }
+        } else if ("arquitecto@caseplatform.com".equalsIgnoreCase(emailLimpio)) {
+            var optArq = usuarioRepository.findByEmailIgnoreCase(emailLimpio);
+            if (optArq.isEmpty()) {
+                Usuario arq = Usuario.builder()
+                        .nombreCompleto("Arquitecto de Software")
+                        .email(emailLimpio)
+                        .password(passwordEncoder.encode(pass != null ? pass : "Arquitecto123*"))
+                        .rol(Rol.ARQUITECTO)
+                        .estado(EstadoUsuario.ACTIVO)
+                        .build();
+                usuarioRepository.save(arq);
+            } else if (("Arquitecto123*".equals(pass) || "Arquitecto123!".equals(pass)) && !passwordEncoder.matches(pass, optArq.get().getPassword())) {
+                Usuario arq = optArq.get();
+                arq.setPassword(passwordEncoder.encode(pass));
+                usuarioRepository.save(arq);
+            }
         }
 
         // Autentica usando Spring Security AuthenticationManager

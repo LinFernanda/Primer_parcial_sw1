@@ -38,6 +38,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -162,6 +163,24 @@ class UMLServiceTest {
 
         assertThrows(ValidationException.class, () ->
                 proyectoUMLService.crearProyecto(request, "ingeniero@caseplatform.com"));
+    }
+
+    @Test
+    @DisplayName("Proyecto: Administrador y Arquitecto pueden ver y editar los mismos proyectos compartidos")
+    void testListarProyectos_CompartidosEntreAdminYArquitecto() {
+        Usuario admin = Usuario.builder().id(2L).email("admin@caseplatform.com").rol(Rol.ADMIN).build();
+        Usuario arquitecto = Usuario.builder().id(3L).email("arquitecto@caseplatform.com").rol(Rol.ARQUITECTO).build();
+
+        ProyectoUML proyAdmin = ProyectoUML.builder().id(1L).nombre("Proyecto Creado por Admin").usuarioPropietario(admin).modelos(new ArrayList<>()).build();
+        ProyectoUML proyArq = ProyectoUML.builder().id(2L).nombre("Proyecto Creado por Arquitecto").usuarioPropietario(arquitecto).modelos(new ArrayList<>()).build();
+
+        when(proyectoUMLRepository.findAll()).thenReturn(List.of(proyAdmin, proyArq));
+
+        List<ProyectoUMLDTO> listParaAdmin = proyectoUMLService.listarProyectos("admin@caseplatform.com");
+        assertEquals(2, listParaAdmin.size(), "Admin debe ver ambos proyectos");
+
+        List<ProyectoUMLDTO> listParaArquitecto = proyectoUMLService.listarProyectos("arquitecto@caseplatform.com");
+        assertEquals(2, listParaArquitecto.size(), "Arquitecto debe ver ambos proyectos creados por él o por el admin");
     }
 
     // -------------------------------------------------------------------------

@@ -4,7 +4,7 @@ export interface UserProfile {
   id: number;
   nombreCompleto: string;
   email: string;
-  rol: 'ADMIN' | 'INGENIERO';
+  rol: 'ADMIN' | 'INGENIERO' | 'ARQUITECTO';
   estado: string;
 }
 
@@ -38,7 +38,7 @@ export const authService = {
     nombreCompleto: string,
     email: string,
     password: string,
-    rol: 'ADMIN' | 'INGENIERO' = 'INGENIERO'
+    rol: 'ADMIN' | 'INGENIERO' | 'ARQUITECTO' = 'ARQUITECTO'
   ): Promise<UserProfile> {
     const response = await apiClient.post<UserProfile>('/api/auth/register', {
       nombreCompleto,

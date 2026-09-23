@@ -84,7 +84,7 @@ public class SecurityConfig {
 
                         // Rutas protegidas para usuarios
                         .requestMatchers("/api/users/me").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/users/**").hasAnyRole("ADMIN", "INGENIERO")
+                        .requestMatchers(HttpMethod.GET, "/api/users/**").hasAnyRole("ADMIN", "INGENIERO", "ARQUITECTO")
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
 
                         // Rutas protegidas del Núcleo UML 2.5, Versiones, IA, Visión y Generador

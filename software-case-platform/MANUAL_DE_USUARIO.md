@@ -177,9 +177,9 @@ CASE Platform implementa un esquema de seguridad robusto basado en **JSON Web To
 
 > [!NOTE]
 > **Usuarios de demostración preconfigurados:**
-> - **Administrador:** `admin@caseplatform.com` | Clave: `admin123`
-> - **Arquitecto de Software:** `ingeniero.vision@caseplatform.com` | Clave: `password123`
-> - **Desarrollador:** `dev@caseplatform.com` | Clave: `dev123`
+> - **Administrador:** `admin@caseplatform.com` | Clave: `Admin123*`
+> - **Arquitecto de Software:** `arquitecto@caseplatform.com` | Clave: `Arquitecto123*`
+> - **Ingeniero de Software:** `ingeniero@caseplatform.com` | Clave: `Ingeniero123*`
 
 ### 4.2. Registro de Nuevos Usuarios
 Si no posee una cuenta, haga clic en la pestaña o enlace **"Crear Cuenta"** en la pantalla de inicio:
@@ -238,6 +238,13 @@ Utilice la barra de búsqueda superior para filtrar proyectos por nombre o palab
 ### 5.3. Abrir o Eliminar un Proyecto
 - **Abrir:** Haga clic en la tarjeta del proyecto o en el botón **"Abrir"** para ingresar al lienzo de modelado.
 - **Eliminar:** Haga clic en el icono del cesto de basura (`🗑️`) para borrar un proyecto. El sistema le solicitará confirmación antes de proceder.
+
+### 5.4. Edición Colaborativa Compartida entre Administrador y Arquitecto
+En CASE Platform, los roles de **Administrador** y **Arquitecto** (así como Ingeniero de Software) operan sobre un entorno de trabajo unificado y compartido:
+* **Visibilidad Cruzada Inmediata:** Cuando el Administrador crea un proyecto, este aparece automáticamente en la lista de proyectos del Arquitecto con su respectivo botón **"Abrir Editor"** para que pueda comenzar a diseñar y modelar sin intermediarios.
+* **Reciprocidad:** Del mismo modo, cualquier proyecto creado por un Arquitecto está disponible al instante para que el Administrador lo visualice, configure o edite.
+* **Autoría Transparente:** Cada tarjeta de proyecto indica claramente quién fue el creador del mismo (ej. `👤 Creado por: arquitecto@caseplatform.com`).
+* **Edición Simultánea en Tiempo Real:** Ambos pueden abrir el mismo proyecto a la vez y ver los cambios reflejados en vivo a través de la conexión por WebSockets.
 
 ---
 
