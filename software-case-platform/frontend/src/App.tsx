@@ -23,7 +23,7 @@ export const App: React.FC = () => {
       <footer className="footer">
         <div className="footer-content">
           <span>CASE Platform © 2026 - Plataforma CASE Colaborativa Inteligente</span>
-          <span>Fase 1: Preparación del Proyecto &amp; Arquitectura Base</span>
+          <span>Arquitectura Base y Modelado Conceptual UML</span>
         </div>
       </footer>
     </div>

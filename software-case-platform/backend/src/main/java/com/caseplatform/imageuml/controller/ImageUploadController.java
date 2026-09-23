@@ -30,7 +30,7 @@ public class ImageUploadController {
     private final com.caseplatform.imageuml.detector.UMLDetectorService umlDetectorService;
 
     /**
-     * Endpoint oficial según especificación de la Fase 8:
+     * Endpoint oficial para carga y análisis de diagramas UML por imagen:
      * POST /api/imageuml/upload
      * Recibe la imagen en formato multipart/form-data (y opcionalmente texto OCR previo) y retorna el resultado.
      */

@@ -35,38 +35,38 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   const phases = [
     {
-      id: 'FASE 1',
-      name: 'Preparación del Proyecto y Arquitectura Base',
-      status: 'Completada',
+      id: 'Arquitectura',
+      name: 'Arquitectura Base y Persistencia',
+      status: 'Operativo',
       ready: true,
       desc: 'Monorepo organizado, Spring Boot 3 + Java 21, React + Vite + TypeScript, Flutter estructura, PostgreSQL 16.',
     },
     {
-      id: 'FASE 2',
+      id: 'Seguridad',
       name: 'Sistema de Usuarios, Autenticación y Seguridad',
-      status: 'Siguiente',
-      ready: false,
+      status: 'Operativo',
+      ready: true,
       desc: 'JWT Stateless, RBAC, registro, login, refresh token, protección de endpoints.',
     },
     {
-      id: 'FASE 3',
+      id: 'Metamodelo',
       name: 'Núcleo UML 2.5 y Modelo Conceptual',
-      status: 'Pendiente',
-      ready: false,
+      status: 'Operativo',
+      ready: true,
       desc: 'Modelo metamodelo UML 2.5, clases, atributos, métodos, relaciones, cardinalidades.',
     },
     {
-      id: 'FASE 4',
+      id: 'Editor UML',
       name: 'Editor Visual UML 2.5',
-      status: 'Pendiente',
-      ready: false,
+      status: 'Operativo',
+      ready: true,
       desc: 'Canvas interactivo, drag and drop, renderizado SVG/Canvas, zoom y exportación.',
     },
     {
-      id: 'FASE 5',
+      id: 'Colaboración',
       name: 'Colaboración en Tiempo Real (WebSocket)',
-      status: 'Pendiente',
-      ready: false,
+      status: 'Operativo',
+      ready: true,
       desc: 'STOMP / WebSocket, presencia de usuarios, cursores remotos, locking optimista.',
     },
   ];
@@ -76,7 +76,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* Banner / Hero */}
       <section className="hero-banner">
         <div className="hero-content">
-          <div className="hero-badge">FASE 1 --- ARQUITECTURA BASE PREPARADA</div>
+          <div className="hero-badge">ARQUITECTURA &amp; MODELADO UML OPERATIVO</div>
           <h2 className="hero-title">
             {info?.name || 'Plataforma CASE Colaborativa Inteligente'}
           </h2>
@@ -218,11 +218,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </div>
       </section>
 
-      {/* Project Roadmap */}
+      {/* Project Modules Overview */}
       <section className="roadmap-section">
         <div className="section-header">
           <FileCode2 size={20} />
-          <h3>Hoja de Ruta del Proyecto CASE Platform</h3>
+          <h3>Módulos Principales de CASE Platform</h3>
         </div>
         <div className="phases-list">
           {phases.map((phase) => (

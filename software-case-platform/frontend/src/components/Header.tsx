@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div className="status-badge phase">
               <ShieldCheck size={15} />
-              <span>Fase 1: Preparada</span>
+              <span>Sistema: Operativo</span>
             </div>
           </div>
 

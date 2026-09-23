@@ -73,7 +73,7 @@ public class HealthServiceImpl implements HealthService {
     public Map<String, Object> getSystemMetadata() {
         Map<String, Object> meta = new HashMap<>();
         meta.put("name", "CASE Platform Backend");
-        meta.put("phase", "FASE 1 - Preparacion de Proyecto y Arquitectura Base");
+        meta.put("phase", "Arquitectura Base y Modelado Conceptual UML");
         meta.put("status", "ACTIVE");
         meta.put("capabilities", new String[]{
                 "UML 2.5 Modeling Ready",

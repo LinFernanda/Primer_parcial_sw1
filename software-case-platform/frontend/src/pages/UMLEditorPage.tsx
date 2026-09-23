@@ -244,7 +244,7 @@ export const UMLEditorPage: React.FC = () => {
           onSubmit={handleCreateRelation}
         />
 
-        {/* Panel de Control de Versiones, Historial y Trazabilidad (Fase 6) */}
+        {/* Panel de Control de Versiones, Historial y Trazabilidad */}
         {selectedModeloId && (
           <VersionPanel
             isOpen={isVersioningOpen}
@@ -258,7 +258,7 @@ export const UMLEditorPage: React.FC = () => {
           />
         )}
 
-        {/* Asistente Inteligente de Edición UML por Texto y Voz (Fase 7) */}
+        {/* Asistente Inteligente de Edición UML por Texto y Voz */}
         {selectedModeloId && (
           <AIChatPanel
             isOpen={isAIChatOpen}
@@ -271,7 +271,7 @@ export const UMLEditorPage: React.FC = () => {
           />
         )}
 
-        {/* Modal de Conversión de Imagen a UML con Visión Artificial (Fase 8) */}
+        {/* Modal de Conversión de Imagen a UML con Visión Artificial */}
         {selectedModeloId && (
           <ImageUMLModal
             isOpen={isImageUMLOpen}
@@ -283,7 +283,7 @@ export const UMLEditorPage: React.FC = () => {
           />
         )}
 
-        {/* Modal de Generación Automática de Backend Spring Boot (Fase 9) */}
+        {/* Modal de Generación Automática de Backend Spring Boot */}
         {selectedModeloId && (
           <CodeGeneratorModal
             isOpen={isGeneratorOpen}
@@ -293,7 +293,7 @@ export const UMLEditorPage: React.FC = () => {
           />
         )}
 
-        {/* Modal de Interoperabilidad con Enterprise Architect (Fase 10) */}
+        {/* Modal de Interoperabilidad con Enterprise Architect */}
         {selectedModeloId && (
           <EnterpriseArchitectModal
             isOpen={isEAOpen}

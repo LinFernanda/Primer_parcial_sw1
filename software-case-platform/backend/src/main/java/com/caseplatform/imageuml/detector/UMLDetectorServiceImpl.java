@@ -57,6 +57,7 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
             try {
                 ImageUMLDetectedDTO groqResult = detectWithGroqText(ocrText);
                 if (groqResult != null && groqResult.getClases() != null && !groqResult.getClases().isEmpty()) {
+                    resolveManyToManyRelationships(groqResult);
                     groqResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
                     applyAutoLayout(groqResult.getClases());
                     log.info("Detección exitosa con Groq AI: {} clases, {} relaciones",
@@ -64,23 +65,7 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
                     return groqResult;
                 }
             } catch (Exception e) {
-                log.warn("Fallo el análisis con Groq AI, recurriendo a motor local: {}", e.getMessage());
-            }
-        }
-
-        // 2. Prioridad: OpenAI Vision AI (GPT-4o) si hay API Key disponible
-        if (aiConfig != null && aiConfig.hasOpenAI() && imageBytes != null) {
-            try {
-                ImageUMLDetectedDTO resultAI = detectWithMultimodalAI(imageBytes);
-                if (resultAI != null && resultAI.getClases() != null && !resultAI.getClases().isEmpty()) {
-                    resultAI.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
-                    resultAI.setMotorUtilizado("OPENAI_VISION_AI");
-                    applyAutoLayout(resultAI.getClases());
-                    return resultAI;
-                }
-            } catch (Exception e) {
-                log.warn("Fallo o no respondió el servicio de Visión Multimodal ({}), recurriendo a motor local: {}",
-                        aiConfig.getModel(), e.getMessage());
+                log.warn("Fallo el análisis con Groq AI, recurriendo a siguiente opción: {}", e.getMessage());
             }
         }
 
@@ -90,6 +75,7 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
             try {
                 ImageUMLDetectedDTO geminiResult = detectWithGeminiAI(imageBytes);
                 if (geminiResult != null && geminiResult.getClases() != null && !geminiResult.getClases().isEmpty()) {
+                    resolveManyToManyRelationships(geminiResult);
                     geminiResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
                     applyAutoLayout(geminiResult.getClases());
                     log.info("Detección exitosa con Google Gemini Vision (motor '{}'): {} clases, {} relaciones",
@@ -104,10 +90,28 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
             }
         }
 
+        // 3. Prioridad: OpenAI Vision AI (GPT-4o) si hay API Key disponible
+        if (aiConfig != null && aiConfig.hasOpenAI() && imageBytes != null) {
+            try {
+                ImageUMLDetectedDTO resultAI = detectWithMultimodalAI(imageBytes);
+                if (resultAI != null && resultAI.getClases() != null && !resultAI.getClases().isEmpty()) {
+                    resolveManyToManyRelationships(resultAI);
+                    resultAI.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
+                    resultAI.setMotorUtilizado("OPENAI_VISION_AI");
+                    applyAutoLayout(resultAI.getClases());
+                    return resultAI;
+                }
+            } catch (Exception e) {
+                log.warn("Fallo o no respondió el servicio de Visión Multimodal ({}), recurriendo a motor local: {}",
+                        aiConfig.getModel(), e.getMessage());
+            }
+        }
+
         // 4. Si se recibió texto reconocido por OCR en frontend, parsearlo
         if (ocrText != null && !ocrText.isBlank()) {
             ImageUMLDetectedDTO ocrResult = detectUMLFromText(ocrText);
             if (ocrResult != null && ocrResult.getClases() != null && !ocrResult.getClases().isEmpty()) {
+                resolveManyToManyRelationships(ocrResult);
                 ocrResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
                 if (ocrResult.getMotorUtilizado() == null || ocrResult.getMotorUtilizado().isBlank()) {
                     ocrResult.setMotorUtilizado("TESSERACT_OCR_LOCAL_ENGINE");
@@ -120,6 +124,7 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
 
         // 5. Motor de Visión Computacional y Reconocimiento Estructural Local (Offline)
         ImageUMLDetectedDTO localResult = detectWithLocalComputerVision(image, filename, ocrText);
+        resolveManyToManyRelationships(localResult);
         localResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
         localResult.setMotorUtilizado("COMPUTER_VISION_OCR_ENGINE");
         applyAutoLayout(localResult.getClases());
@@ -134,6 +139,7 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
             try {
                 ImageUMLDetectedDTO groqResult = detectWithGroqText(rawText);
                 if (groqResult != null && groqResult.getClases() != null && !groqResult.getClases().isEmpty()) {
+                    resolveManyToManyRelationships(groqResult);
                     groqResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
                     applyAutoLayout(groqResult.getClases());
                     return groqResult;
@@ -149,6 +155,7 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
             try {
                 ImageUMLDetectedDTO geminiResult = detectWithGeminiText(rawText);
                 if (geminiResult != null && geminiResult.getClases() != null && !geminiResult.getClases().isEmpty()) {
+                    resolveManyToManyRelationships(geminiResult);
                     geminiResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
                     applyAutoLayout(geminiResult.getClases());
                     return geminiResult;
@@ -159,12 +166,10 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
         }
 
         // 3. Fallback Determinístico Local por Reglas/Regex
-
         List<ClaseDetectadaDTO> clases = textParser.parseClassesFromText(rawText);
         List<RelacionDetectadaDTO> relaciones = textParser.parseRelationsFromText(rawText);
-        applyAutoLayout(clases);
 
-        return ImageUMLDetectedDTO.builder()
+        ImageUMLDetectedDTO localTextResult = ImageUMLDetectedDTO.builder()
                 .clases(clases)
                 .relaciones(relaciones)
                 .nivelConfianza(0.95)
@@ -172,6 +177,9 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
                 .motorUtilizado("TEXT_UML_PARSER")
                 .tiempoProcesamientoMs(System.currentTimeMillis() - startTime)
                 .build();
+        resolveManyToManyRelationships(localTextResult);
+        applyAutoLayout(localTextResult.getClases());
+        return localTextResult;
     }
 
     /**
@@ -182,10 +190,21 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
         String dataUrl = "data:image/png;base64," + base64Image;
 
         String systemPrompt = """
-                Eres un experto en visión artificial, ingeniería de software y análisis de diagramas UML 2.5.
-                Analiza minuciosamente la imagen del diagrama UML de clases conceptual.
+                Eres un experto en visión artificial, ingeniería de software, arquitectura de sistemas y análisis de diagramas UML 2.5 y modelos Entidad-Relación de bases de datos.
+                Analiza minuciosamente la imagen del diagrama de base de datos / entidad-relación adjunto.
                 Extrae TODAS las clases, atributos, visibilidades, tipos de datos, métodos, relaciones y cardinalidades.
                 
+                REGLA CRÍTICA - RESOLUCIÓN DE RELACIONES MUCHOS A MUCHOS (N:M o 1..* <-> 1..*):
+                Para cualquier relación de muchos a muchos (N:M o 1..* <-> 1..*) que encuentres entre las entidades principales, asegúrate de:
+                1. Resolver la relación creando una entidad asociativa (tabla intermedia / pivote) en la lista de clases.
+                2. Asignarle un nombre descriptivo adecuado según el contexto del diagrama (por ejemplo: Detalle_Venta, Detalle_Pedido, Inscripcion, Matricula, Asignacion, Usuario_Rol, Cita_Medica, etc.).
+                3. Incluir las claves foráneas (foreign keys) que conectan con ambas tablas padre (por ejemplo: id_venta: Long, id_producto: Long).
+                4. Agregar los atributos propios de la relación que correspondan al contexto del diagrama (por ejemplo: cantidad: Integer, precio_unitario: Double, subtotal: Double, fecha_registro: LocalDate, estado: String, etc.).
+                5. Conectar ambas entidades padre con la entidad asociativa mediante dos relaciones 1 a muchos (1..*):
+                   - EntidadPadreA (1) ---- (*) EntidadAsociativa
+                   - EntidadPadreB (1) ---- (*) EntidadAsociativa
+                NO dejes relaciones directas N:M entre las entidades principales; deben quedar resueltas a través de la entidad asociativa intermedia.
+
                 Debes responder EXCLUSIVAMENTE con un JSON válido con la siguiente estructura exacta:
                 {
                   "clases": [
@@ -218,7 +237,7 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
                 - Visibilidad permitida: PUBLIC, PRIVATE, PROTECTED, PACKAGE.
                 - Tipo de relación permitida: ASOCIACION, HERENCIA, AGREGACION, COMPOSICION, DEPENDENCIA.
                 - Cardinalidades permitidas: "1", "0..1", "*", "1..*", "0..*".
-                - Tipos de datos normalizados: String, Integer, Long, Double, Boolean, Date, etc.
+                - Tipos de datos normalizados: String, Integer, Long, Double, Boolean, LocalDate, LocalDateTime, etc.
                 - Si no se especifica cardinalidad, asumir "1" o "*".
                 - No agregues explicaciones fuera del bloque JSON.
                 """;
@@ -261,9 +280,20 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
         }
 
         String systemPrompt = """
-                Eres un experto en visión artificial, ingeniería de software y análisis de diagramas UML 2.5.
-                Analiza el siguiente texto descriptivo o extraído por OCR de un diagrama de clases UML.
+                Eres un experto en visión artificial, ingeniería de software, arquitectura de sistemas y análisis de diagramas UML 2.5 y modelos Entidad-Relación de bases de datos.
+                Analiza el siguiente texto descriptivo o extraído por OCR de un diagrama de clases UML / base de datos.
                 Extrae minuciosamente TODAS las clases, atributos, visibilidades, tipos de datos, métodos, relaciones y cardinalidades.
+                
+                REGLA CRÍTICA - RESOLUCIÓN DE RELACIONES MUCHOS A MUCHOS (N:M o 1..* <-> 1..*):
+                Para cualquier relación de muchos a muchos (N:M o 1..* <-> 1..*) que encuentres entre las entidades principales, asegúrate de:
+                1. Resolver la relación creando una entidad asociativa (tabla intermedia / pivote) en la lista de clases.
+                2. Asignarle un nombre descriptivo adecuado según el contexto del diagrama (por ejemplo: Detalle_Venta, Detalle_Pedido, Inscripcion, Matricula, Asignacion, Usuario_Rol, Cita_Medica, etc.).
+                3. Incluir las claves foráneas (foreign keys) que conectan con ambas tablas padre (por ejemplo: id_venta: Long, id_producto: Long).
+                4. Agregar los atributos propios de la relación que correspondan al contexto del diagrama (por ejemplo: cantidad: Integer, precio_unitario: Double, subtotal: Double, fecha_registro: LocalDate, estado: String, etc.).
+                5. Conectar ambas entidades padre con la entidad asociativa mediante dos relaciones 1 a muchos (1..*):
+                   - EntidadPadreA (1) ---- (*) EntidadAsociativa
+                   - EntidadPadreB (1) ---- (*) EntidadAsociativa
+                NO dejes relaciones directas N:M entre las entidades principales; deben quedar resueltas a través de la entidad asociativa intermedia.
                 
                 Debes responder EXCLUSIVAMENTE con un JSON válido con la siguiente estructura exacta:
                 {
@@ -346,9 +376,20 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
         }
 
         String prompt = """
-                Eres un experto en ingeniería de software, arquitectura de sistemas y análisis de diagramas UML 2.5.
-                Analiza el siguiente texto descriptivo o extraído por OCR de un diagrama de clases UML.
+                Eres un experto en ingeniería de software, arquitectura de sistemas y análisis de diagramas UML 2.5 y modelos Entidad-Relación de bases de datos.
+                Analiza el siguiente texto descriptivo o extraído por OCR de un diagrama de clases UML / base de datos.
                 Extrae minuciosamente TODAS las clases, atributos, visibilidades, tipos de datos, métodos, relaciones y cardinalidades.
+                
+                REGLA CRÍTICA - RESOLUCIÓN DE RELACIONES MUCHOS A MUCHOS (N:M o 1..* <-> 1..*):
+                Para cualquier relación de muchos a muchos (N:M o 1..* <-> 1..*) que encuentres entre las entidades principales, asegúrate de:
+                1. Resolver la relación creando una entidad asociativa (tabla intermedia / pivote) en la lista de clases.
+                2. Asignarle un nombre descriptivo adecuado según el contexto del diagrama (por ejemplo: Detalle_Venta, Detalle_Pedido, Inscripcion, Matricula, Asignacion, Usuario_Rol, Cita_Medica, etc.).
+                3. Incluir las claves foráneas (foreign keys) que conectan con ambas tablas padre (por ejemplo: id_venta: Long, id_producto: Long).
+                4. Agregar los atributos propios de la relación que correspondan al contexto del diagrama (por ejemplo: cantidad: Integer, precio_unitario: Double, subtotal: Double, fecha_registro: LocalDate, estado: String, etc.).
+                5. Conectar ambas entidades padre con la entidad asociativa mediante dos relaciones 1 a muchos (1..*):
+                   - EntidadPadreA (1) ---- (*) EntidadAsociativa
+                   - EntidadPadreB (1) ---- (*) EntidadAsociativa
+                NO dejes relaciones directas N:M entre las entidades principales; deben quedar resueltas a través de la entidad asociativa intermedia.
                 
                 Debes responder EXCLUSIVAMENTE con un JSON válido con la siguiente estructura exacta:
                 {
@@ -474,9 +515,20 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
         String mimeType = detectMimeType(imageBytes);
 
         String prompt = """
-                Eres un experto en ingeniería de software, arquitectura de sistemas y análisis visual de diagramas UML 2.5.
-                Analiza minuciosamente la imagen del diagrama UML conceptual proporcionada.
-                Examina cada caja de clase (nombre, visibilidad, atributos, métodos) y cada línea de conexión o relación (herencia, asociación, agregación, composición, dependencia) junto con sus cardinalidades y roles.
+                Eres un experto en ingeniería de software, arquitectura de sistemas y análisis visual de diagramas UML 2.5 y diagramas Entidad-Relación de bases de datos.
+                Analiza minuciosamente el diagrama de base de datos / entidad-relación adjunto en la imagen.
+                Examina cada caja de clase/entidad (nombre, visibilidad, atributos, métodos) y cada línea de conexión o relación (herencia, asociación, agregación, composición, dependencia) junto con sus cardinalidades y roles.
+
+                REGLA CRÍTICA - RESOLUCIÓN DE RELACIONES MUCHOS A MUCHOS (N:M o 1..* <-> 1..*):
+                Para cualquier relación de muchos a muchos (N:M o 1..* <-> 1..*) que encuentres entre las entidades principales, asegúrate de:
+                1. Resolver la relación creando una entidad asociativa (tabla intermedia / pivote) en la lista de clases.
+                2. Asignarle un nombre descriptivo adecuado según el contexto del diagrama (por ejemplo: Detalle_Venta, Detalle_Pedido, Inscripcion, Matricula, Asignacion, Usuario_Rol, Cita_Medica, etc.).
+                3. Incluir las claves foráneas (foreign keys) que conectan con ambas tablas padre (por ejemplo: id_venta: Long, id_producto: Long).
+                4. Agregar los atributos propios de la relación que correspondan al contexto del diagrama (por ejemplo: cantidad: Integer, precio_unitario: Double, subtotal: Double, fecha_registro: LocalDate, estado: String, etc.).
+                5. Conectar ambas entidades padre con la entidad asociativa mediante dos relaciones 1 a muchos (1..*):
+                   - EntidadPadreA (1) ---- (*) EntidadAsociativa
+                   - EntidadPadreB (1) ---- (*) EntidadAsociativa
+                NO dejes relaciones directas N:M entre las entidades principales; deben quedar resueltas a través de la entidad asociativa intermedia.
 
                 Debes responder EXCLUSIVAMENTE con un objeto JSON válido con la siguiente estructura exacta:
                 {
@@ -510,7 +562,7 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
                 - Visibilidad permitida: PUBLIC, PRIVATE, PROTECTED, PACKAGE.
                 - Tipo de relación permitida: ASOCIACION, HERENCIA, AGREGACION, COMPOSICION, DEPENDENCIA.
                 - Cardinalidades permitidas: "1", "0..1", "*", "1..*", "0..*".
-                - Tipos de datos normalizados: String, Integer, Long, Double, Boolean, Date, etc.
+                - Tipos de datos normalizados: String, Integer, Long, Double, Boolean, LocalDate, LocalDateTime, etc.
                 - Si hay herencia (flecha triangular hueca o abierta), tipoRelacion es HERENCIA.
                 - Si hay rombo relleno negro, tipoRelacion es COMPOSICION. Si hay rombo blanco/hueco, AGREGACION.
                 - No incluyas explicaciones ni bloques markdown fuera del JSON.
@@ -720,13 +772,15 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
                 }
             }
 
-            return ImageUMLDetectedDTO.builder()
+            ImageUMLDetectedDTO result = ImageUMLDetectedDTO.builder()
                     .clases(clases)
                     .relaciones(relaciones)
                     .nivelConfianza(0.98)
                     .advertencias(new ArrayList<>())
                     .motorUtilizado(motor)
                     .build();
+            resolveManyToManyRelationships(result);
+            return result;
 
         } catch (Exception e) {
             log.error("Error al parsear el JSON de modelo UML: {}", e.getMessage(), e);
@@ -910,5 +964,196 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
         } catch (Exception e) {
             return TipoRelacionUML.ASOCIACION;
         }
+    }
+
+    private String toSnakeCase(String input) {
+        if (input == null || input.isBlank()) return "";
+        return input.replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase().replaceAll("[^a-z0-9_]+", "_");
+    }
+
+    private String capitalize(String str) {
+        if (str == null || str.isBlank()) return "";
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
+
+    private boolean isMany(String card) {
+        if (card == null) return false;
+        String c = card.trim().toLowerCase();
+        return c.contains("*") || c.equals("n") || c.equals("m") || c.endsWith("..*");
+    }
+
+    private String inferAssociativeEntityName(String origen, String destino) {
+        String o = origen.toLowerCase();
+        String d = destino.toLowerCase();
+
+        // Casos comunes de dominio
+        if ((o.contains("venta") && d.contains("producto")) || (d.contains("venta") && o.contains("producto"))) {
+            return "Detalle_Venta";
+        }
+        if ((o.contains("pedido") && d.contains("producto")) || (d.contains("pedido") && o.contains("producto"))) {
+            return "Detalle_Pedido";
+        }
+        if ((o.contains("factura") && d.contains("producto")) || (d.contains("factura") && o.contains("producto"))) {
+            return "Detalle_Factura";
+        }
+        if ((o.contains("estudiante") && (d.contains("curso") || d.contains("materia") || d.contains("asignatura")))
+                || (d.contains("estudiante") && (o.contains("curso") || o.contains("materia") || o.contains("asignatura")))) {
+            return "Inscripcion";
+        }
+        if ((o.contains("alumno") && (d.contains("curso") || d.contains("materia") || d.contains("asignatura")))
+                || (d.contains("alumno") && (o.contains("curso") || o.contains("materia") || o.contains("asignatura")))) {
+            return "Matricula";
+        }
+        if ((o.contains("empleado") && d.contains("proyecto")) || (d.contains("empleado") && o.contains("proyecto"))) {
+            return "Asignacion";
+        }
+        if ((o.contains("usuario") && d.contains("rol")) || (d.contains("usuario") && o.contains("rol"))) {
+            return "Usuario_Rol";
+        }
+        if ((o.contains("medico") && d.contains("paciente")) || (d.contains("medico") && o.contains("paciente"))) {
+            return "Cita_Medica";
+        }
+        if ((o.contains("cliente") && d.contains("servicio")) || (d.contains("cliente") && o.contains("servicio"))) {
+            return "Contrato";
+        }
+        if ((o.contains("libro") && d.contains("autor")) || (d.contains("libro") && o.contains("autor"))) {
+            return "Libro_Autor";
+        }
+        if ((o.contains("persona") && d.contains("evento")) || (d.contains("persona") && o.contains("evento"))) {
+            return "Participacion";
+        }
+
+        return capitalize(origen) + "_" + capitalize(destino);
+    }
+
+    private List<AtributoDetectadoDTO> buildAssociativeAttributes(String origen, String destino) {
+        List<AtributoDetectadoDTO> attrs = new ArrayList<>();
+
+        // Clave primaria
+        attrs.add(AtributoDetectadoDTO.builder()
+                .nombre("id")
+                .tipoDato("Long")
+                .visibilidad(VisibilidadUML.PRIVATE)
+                .build());
+
+        // Claves foráneas (Foreign Keys) que conectan con ambas tablas padre
+        attrs.add(AtributoDetectadoDTO.builder()
+                .nombre("id_" + toSnakeCase(origen))
+                .tipoDato("Long")
+                .visibilidad(VisibilidadUML.PRIVATE)
+                .build());
+
+        attrs.add(AtributoDetectadoDTO.builder()
+                .nombre("id_" + toSnakeCase(destino))
+                .tipoDato("Long")
+                .visibilidad(VisibilidadUML.PRIVATE)
+                .build());
+
+        // Atributos propios de la relación que corresponden al contexto del diagrama
+        String o = origen.toLowerCase();
+        String d = destino.toLowerCase();
+
+        if (o.contains("venta") || d.contains("venta") || o.contains("pedido") || d.contains("pedido") || o.contains("factura") || d.contains("factura")) {
+            attrs.add(AtributoDetectadoDTO.builder().nombre("cantidad").tipoDato("Integer").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("precio_unitario").tipoDato("Double").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("subtotal").tipoDato("Double").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("fecha_registro").tipoDato("LocalDate").visibilidad(VisibilidadUML.PRIVATE).build());
+        } else if (o.contains("estudiante") || d.contains("estudiante") || o.contains("alumno") || d.contains("alumno")) {
+            attrs.add(AtributoDetectadoDTO.builder().nombre("fecha_inscripcion").tipoDato("LocalDate").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("nota_final").tipoDato("Double").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("estado").tipoDato("String").visibilidad(VisibilidadUML.PRIVATE).build());
+        } else if (o.contains("empleado") || d.contains("empleado") || o.contains("proyecto") || d.contains("proyecto")) {
+            attrs.add(AtributoDetectadoDTO.builder().nombre("fecha_asignacion").tipoDato("LocalDate").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("horas_dedicadas").tipoDato("Integer").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("rol").tipoDato("String").visibilidad(VisibilidadUML.PRIVATE).build());
+        } else if (o.contains("medico") || d.contains("medico") || o.contains("paciente") || d.contains("paciente")) {
+            attrs.add(AtributoDetectadoDTO.builder().nombre("fecha_cita").tipoDato("LocalDateTime").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("diagnostico").tipoDato("String").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("costo").tipoDato("Double").visibilidad(VisibilidadUML.PRIVATE).build());
+        } else {
+            attrs.add(AtributoDetectadoDTO.builder().nombre("fecha_registro").tipoDato("LocalDate").visibilidad(VisibilidadUML.PRIVATE).build());
+            attrs.add(AtributoDetectadoDTO.builder().nombre("estado").tipoDato("String").visibilidad(VisibilidadUML.PRIVATE).build());
+        }
+
+        return attrs;
+    }
+
+    /**
+     * Resuelve programáticamente cualquier relación de muchos a muchos (N:M o 1..* <-> 1..*)
+     * transformándola en una entidad asociativa intermedia con claves foráneas, atributos
+     * contextuales y dos relaciones 1 a muchos.
+     */
+    private void resolveManyToManyRelationships(ImageUMLDetectedDTO dto) {
+        if (dto == null || dto.getRelaciones() == null || dto.getClases() == null) {
+            return;
+        }
+
+        List<RelacionDetectadaDTO> relacionesOriginales = new ArrayList<>(dto.getRelaciones());
+        List<RelacionDetectadaDTO> nuevasRelaciones = new ArrayList<>();
+        List<ClaseDetectadaDTO> nuevasClases = new ArrayList<>();
+
+        for (RelacionDetectadaDTO rel : relacionesOriginales) {
+            String cOrigen = rel.getCardinalidadOrigen() != null ? rel.getCardinalidadOrigen().trim() : "1";
+            String cDestino = rel.getCardinalidadDestino() != null ? rel.getCardinalidadDestino().trim() : "*";
+
+            boolean originIsMany = isMany(cOrigen);
+            boolean targetIsMany = isMany(cDestino);
+
+            if (originIsMany && targetIsMany) {
+                String origen = rel.getClaseOrigen();
+                String destino = rel.getClaseDestino();
+
+                if (origen != null && destino != null && !origen.equalsIgnoreCase(destino)) {
+                    String intermediateName = inferAssociativeEntityName(origen, destino);
+                    boolean alreadyExists = dto.getClases().stream()
+                            .anyMatch(c -> c.getNombre() != null && (
+                                    c.getNombre().equalsIgnoreCase(intermediateName)
+                                    || c.getNombre().equalsIgnoreCase(origen + destino)
+                                    || c.getNombre().equalsIgnoreCase(destino + origen)
+                            ));
+
+                    if (!alreadyExists && nuevasClases.stream().noneMatch(c -> c.getNombre().equalsIgnoreCase(intermediateName))) {
+                        List<AtributoDetectadoDTO> atributos = buildAssociativeAttributes(origen, destino);
+
+                        ClaseDetectadaDTO asociativa = ClaseDetectadaDTO.builder()
+                                .nombre(intermediateName)
+                                .visibilidad(VisibilidadUML.PUBLIC)
+                                .descripcion("Entidad asociativa intermedia para la relación N:M entre " + origen + " y " + destino)
+                                .atributos(atributos)
+                                .metodos(new ArrayList<>())
+                                .build();
+                        nuevasClases.add(asociativa);
+                    }
+
+                    // Relación 1 -> * desde origen a asociativa
+                    nuevasRelaciones.add(RelacionDetectadaDTO.builder()
+                            .claseOrigen(origen)
+                            .claseDestino(intermediateName)
+                            .tipoRelacion(TipoRelacionUML.ASOCIACION)
+                            .cardinalidadOrigen("1")
+                            .cardinalidadDestino("*")
+                            .descripcion("Asociación 1:N entre " + origen + " y tabla asociativa " + intermediateName)
+                            .build());
+
+                    // Relación 1 -> * desde destino a asociativa
+                    nuevasRelaciones.add(RelacionDetectadaDTO.builder()
+                            .claseOrigen(destino)
+                            .claseDestino(intermediateName)
+                            .tipoRelacion(TipoRelacionUML.ASOCIACION)
+                            .cardinalidadOrigen("1")
+                            .cardinalidadDestino("*")
+                            .descripcion("Asociación 1:N entre " + destino + " y tabla asociativa " + intermediateName)
+                            .build());
+                    continue;
+                }
+            }
+            nuevasRelaciones.add(rel);
+        }
+
+        if (!nuevasClases.isEmpty()) {
+            dto.getClases().addAll(nuevasClases);
+            log.info("Relaciones N:M resueltas automáticamente en análisis de imagen: se crearon {} entidades asociativas intermedias.", nuevasClases.size());
+        }
+        dto.setRelaciones(nuevasRelaciones);
     }
 }

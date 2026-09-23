@@ -260,8 +260,8 @@ Empleado <|-- Administrador`;
                 <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>
                   Formatos aceptados: <strong>PNG, JPG, JPEG</strong> (Máx. 10 MB).
                 </p>
-                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b' }}>
-                  El motor OCR local extraerá automáticamente los nombres reales de clases, atributos y relaciones.
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#38bdf8' }}>
+                  Resolución automática N:M: las relaciones muchos a muchos se descomponen en entidades asociativas intermedias con foreign keys.
                 </p>
               </div>
             </div>

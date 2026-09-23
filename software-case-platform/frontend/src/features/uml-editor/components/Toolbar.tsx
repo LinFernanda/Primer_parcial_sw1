@@ -126,7 +126,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <button
           className="uml-toolbar-btn"
           onClick={onOpenVersioning}
-          title="Control de versiones, snapshots e historial de cambios (Fase 6)"
+          title="Control de versiones, snapshots e historial de cambios"
         >
           <History size={16} style={{ color: '#38bdf8' }} /> Versiones
         </button>
@@ -136,7 +136,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <button
           className="uml-toolbar-btn"
           onClick={onOpenAIChat}
-          title="Abrir Asistente IA para edición inteligente del diagrama UML (Fase 7)"
+          title="Abrir Asistente IA para edición inteligente del diagrama UML"
           style={{
             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
             border: '1px solid rgba(139, 92, 246, 0.5)',
@@ -155,7 +155,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <button
           className="uml-toolbar-btn"
           onClick={onOpenImageUML}
-          title="Convertir imagen de diagrama a modelo UML editable con Visión Artificial (Fase 8)"
+          title="Convertir imagen de diagrama a modelo UML editable con Visión Artificial"
           style={{
             background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%)',
             border: '1px solid rgba(56, 189, 248, 0.5)',
@@ -174,7 +174,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <button
           className="uml-toolbar-btn"
           onClick={onOpenGenerator}
-          title="Generar proyecto backend Spring Boot ejecutable desde el modelo UML (Fase 9)"
+          title="Generar proyecto backend Spring Boot ejecutable desde el modelo UML"
           style={{
             background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%)',
             border: '1px solid rgba(37, 99, 235, 0.5)',
@@ -193,7 +193,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <button
           className="uml-toolbar-btn"
           onClick={onOpenEnterpriseArchitect}
-          title="Interoperabilidad con Enterprise Architect: Importar y Exportar modelos en formato XMI (Fase 10)"
+          title="Interoperabilidad con Enterprise Architect: Importar y Exportar modelos en formato XMI"
           style={{
             background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.15) 100%)',
             border: '1px solid rgba(245, 158, 11, 0.5)',

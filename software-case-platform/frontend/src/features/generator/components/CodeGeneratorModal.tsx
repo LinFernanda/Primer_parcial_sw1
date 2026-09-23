@@ -141,7 +141,7 @@ export const CodeGeneratorModal: React.FC<CodeGeneratorModalProps> = ({
                 Generador de Backend Spring Boot
               </h3>
               <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>
-                Arquitectura por capas, Spring Data JPA y PostgreSQL (Fase 9)
+                Arquitectura por capas, Spring Data JPA y PostgreSQL
               </p>
             </div>
           </div>

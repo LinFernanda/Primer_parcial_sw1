@@ -131,7 +131,7 @@ export const ImageUMLModal: React.FC<ImageUMLModalProps> = ({
                 Conversión de Imagen a Modelo UML
               </h3>
               <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>
-                Visión Artificial, Detección de Contornos y OCR (Fase 8)
+                Visión Artificial, Detección de Contornos y OCR
               </p>
             </div>
           </div>
