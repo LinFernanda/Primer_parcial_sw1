@@ -55,7 +55,7 @@ ai:
     model: ${GROQ_MODEL:openai/gpt-oss-120b}
     base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
   gemini:
-    api-key: ${GEMINI_API_KEY:${AI_GEMINI_API_KEY:}}
+    api-key: ${GEMINI_API_KEY:AQ.Ab8RN6LqMQVzDjcxBX8C9h7nonPwd6ZKt9xRx4A6zkxcR3SxkQ}
     model: ${GEMINI_MODEL:gemini-flash-lite-latest}
   openai:
     api-key: ${AI_OPENAI_API_KEY:${OPENAI_API_KEY:}}

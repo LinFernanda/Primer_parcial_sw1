@@ -84,8 +84,8 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
             }
         }
 
-        // 3. Google Gemini Vision AI SOLO si Groq no está configurado y Gemini está explícitamente configurado
-        if (aiConfig != null && !aiConfig.hasGroq() && aiConfig.hasGemini() && imageBytes != null) {
+        // 2. Google Gemini Vision AI (Análisis multimodal directo de imagen o fallback si Groq no reconoció texto)
+        if (aiConfig != null && aiConfig.hasGemini() && imageBytes != null) {
             geminiAttempted = true;
             try {
                 ImageUMLDetectedDTO geminiResult = detectWithGeminiAI(imageBytes);
@@ -129,14 +129,36 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
     @Override
     public ImageUMLDetectedDTO detectUMLFromText(String rawText) {
         long startTime = System.currentTimeMillis();
+        // 1. Motor Primario: Groq Cloud AI
         if (aiConfig != null && aiConfig.hasGroq()) {
-            ImageUMLDetectedDTO groqResult = detectWithGroqText(rawText);
-            if (groqResult != null && groqResult.getClases() != null && !groqResult.getClases().isEmpty()) {
-                groqResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
-                applyAutoLayout(groqResult.getClases());
-                return groqResult;
+            try {
+                ImageUMLDetectedDTO groqResult = detectWithGroqText(rawText);
+                if (groqResult != null && groqResult.getClases() != null && !groqResult.getClases().isEmpty()) {
+                    groqResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
+                    applyAutoLayout(groqResult.getClases());
+                    return groqResult;
+                }
+                log.warn("Groq AI no devolvió clases para el texto, activando fallback a Google Gemini...");
+            } catch (Exception e) {
+                log.warn("Fallo análisis de texto con Groq AI: {}, pasando a Google Gemini", e.getMessage());
             }
         }
+
+        // 2. Motor Secundario / Fallback: Google Gemini AI
+        if (aiConfig != null && aiConfig.hasGemini()) {
+            try {
+                ImageUMLDetectedDTO geminiResult = detectWithGeminiText(rawText);
+                if (geminiResult != null && geminiResult.getClases() != null && !geminiResult.getClases().isEmpty()) {
+                    geminiResult.setTiempoProcesamientoMs(System.currentTimeMillis() - startTime);
+                    applyAutoLayout(geminiResult.getClases());
+                    return geminiResult;
+                }
+            } catch (Exception e) {
+                log.warn("Fallo análisis de texto con Gemini AI: {}", e.getMessage());
+            }
+        }
+
+        // 3. Fallback Determinístico Local por Reglas/Regex
 
         List<ClaseDetectadaDTO> clases = textParser.parseClassesFromText(rawText);
         List<RelacionDetectadaDTO> relaciones = textParser.parseRelationsFromText(rawText);
@@ -315,13 +337,106 @@ public class UMLDetectorServiceImpl implements UMLDetectorService {
         return null;
     }
 
+    /**
+     * Detección y extracción estructurada de clases y relaciones UML con Google Gemini AI.
+     */
+    private ImageUMLDetectedDTO detectWithGeminiText(String text) {
+        if (text == null || text.isBlank() || aiConfig == null || !aiConfig.hasGemini()) {
+            return null;
+        }
+
+        String prompt = """
+                Eres un experto en ingeniería de software, arquitectura de sistemas y análisis de diagramas UML 2.5.
+                Analiza el siguiente texto descriptivo o extraído por OCR de un diagrama de clases UML.
+                Extrae minuciosamente TODAS las clases, atributos, visibilidades, tipos de datos, métodos, relaciones y cardinalidades.
+                
+                Debes responder EXCLUSIVAMENTE con un JSON válido con la siguiente estructura exacta:
+                {
+                  "clases": [
+                    {
+                      "nombre": "NombreClase",
+                      "visibilidad": "PUBLIC",
+                      "descripcion": "Descripción opcional",
+                      "atributos": [
+                        { "nombre": "id", "tipoDato": "Long", "visibilidad": "PRIVATE", "valorInicial": null },
+                        { "nombre": "nombre", "tipoDato": "String", "visibilidad": "PRIVATE", "valorInicial": null }
+                      ],
+                      "metodos": [
+                        { "nombre": "calcularTotal", "tipoRetorno": "Double", "visibilidad": "PUBLIC", "parametros": null }
+                      ]
+                    }
+                  ],
+                  "relaciones": [
+                    {
+                      "claseOrigen": "Cliente",
+                      "claseDestino": "Venta",
+                      "tipoRelacion": "ASOCIACION",
+                      "cardinalidadOrigen": "1",
+                      "cardinalidadDestino": "*",
+                      "descripcion": null
+                    }
+                  ]
+                }
+                
+                Reglas:
+                - Visibilidad permitida: PUBLIC, PRIVATE, PROTECTED, PACKAGE.
+                - Tipo de relación permitida: ASOCIACION, HERENCIA, AGREGACION, COMPOSICION, DEPENDENCIA.
+                - Cardinalidades permitidas: "1", "0..1", "*", "1..*", "0..*".
+                - Tipos de datos normalizados: String, Integer, Long, Double, Boolean, LocalDate, LocalDateTime, etc.
+                - Si no se especifica cardinalidad, asumir "1" y "*".
+                - No agregues texto ni explicaciones fuera del bloque JSON.
+                
+                Texto a analizar:
+                """ + text;
+
+        Map<String, Object> textPart = Map.of("text", prompt);
+        Map<String, Object> contentObj = Map.of("parts", List.of(textPart));
+        Map<String, Object> requestBody = Map.of(
+                "contents", List.of(contentObj),
+                "generationConfig", Map.of(
+                        "temperature", 0.0,
+                        "responseMimeType", "application/json"
+                )
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        List<String> models = new ArrayList<>();
+        if (aiConfig.getGeminiModel() != null && !aiConfig.getGeminiModel().isBlank()) {
+            models.add(aiConfig.getGeminiModel().trim());
+        }
+        for (String m : GEMINI_MODELS_CASCADE) {
+            if (!models.contains(m)) {
+                models.add(m);
+            }
+        }
+
+        for (String model : models) {
+            try {
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + aiConfig.getGeminiApiKey().trim();
+                ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    ImageUMLDetectedDTO result = parseGeminiJsonResponse(response.getBody(), model);
+                    if (result != null && result.getClases() != null && !result.getClases().isEmpty()) {
+                        log.info("Texto UML interpretado exitosamente con API secundaria Google Gemini ({})", model);
+                        return result;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Fallo o indisponibilidad en Gemini ({}) para análisis de texto UML: {}", model, e.getMessage());
+            }
+        }
+        return null;
+    }
+
     private static final List<String> GEMINI_MODELS_CASCADE = List.of(
             "gemini-flash-lite-latest",
+            "gemini-flash-latest",
             "gemini-3.5-flash-lite",
-            "gemini-3.6-flash",
-            "gemini-3.7-flash",
             "gemini-3.5-flash",
-            "gemini-3-flash-preview"
+            "gemini-3.6-flash"
     );
 
     /**

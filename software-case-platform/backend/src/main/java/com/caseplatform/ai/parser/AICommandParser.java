@@ -51,20 +51,36 @@ public class AICommandParser {
 
         String promptLimpio = prompt.trim();
 
-        // 1. PRIORIDAD MÁXIMA: Si la API Key de Groq AI está configurada, orquestar con Groq LLM
+        // 1. PRIORIDAD MÁXIMA (Motor Primario): Groq Cloud AI (ultrabaja latencia)
         if (aiConfig.hasGroq()) {
             try {
                 ParsedAIAction groqResult = parseWithGroq(promptLimpio);
                 if (groqResult != null && groqResult.getTipoOperacion() != TipoOperacionAI.UNKNOWN) {
                     return groqResult;
                 }
+                log.warn("Groq LLM retornó null o UNKNOWN para: '{}'. Activando fallback a Gemini AI...", promptLimpio);
             } catch (Exception e) {
-                log.warn("Fallo la llamada a Groq LLM ({}), recurriendo a motor local: {}",
+                log.warn("Fallo la llamada a Groq LLM ({}), activando fallback automático a Gemini AI: {}",
                         aiConfig.getGroqModel(), e.getMessage());
             }
         }
 
-        // 2. Si la API Key de OpenAI / LLM está configurada (y no se usó Groq)
+        // 2. RESPALDO / SECUNDARIA (Motor Fallback): Google Gemini AI
+        if (aiConfig.hasGemini()) {
+            try {
+                ParsedAIAction geminiResult = parseWithGemini(promptLimpio);
+                if (geminiResult != null && geminiResult.getTipoOperacion() != TipoOperacionAI.UNKNOWN) {
+                    log.info("Comando interpretado exitosamente con API de respaldo Google Gemini ({})", aiConfig.getGeminiModel());
+                    return geminiResult;
+                }
+                log.warn("Gemini LLM retornó null o UNKNOWN para: '{}'.", promptLimpio);
+            } catch (Exception e) {
+                log.warn("Fallo la llamada a Gemini LLM ({}), recurriendo a opciones locales/OpenAI: {}",
+                        aiConfig.getGeminiModel(), e.getMessage());
+            }
+        }
+
+        // 3. Si la API Key de OpenAI / compatible está configurada
         if (aiConfig.hasOpenAI()) {
             try {
                 ParsedAIAction llmResult = parseWithLLM(promptLimpio);
@@ -74,18 +90,6 @@ public class AICommandParser {
             } catch (Exception e) {
                 log.warn("Fallo la llamada al modelo LLM ({}), utilizando motor de reglas NLP local: {}",
                         aiConfig.getModel(), e.getMessage());
-            }
-        }
-
-        // 3. Si no hay Groq ni OpenAI y Gemini está explícitamente configurado
-        if (!aiConfig.hasGroq() && aiConfig.hasGemini()) {
-            try {
-                ParsedAIAction geminiResult = parseWithGemini(promptLimpio);
-                if (geminiResult != null && geminiResult.getTipoOperacion() != TipoOperacionAI.UNKNOWN) {
-                    return geminiResult;
-                }
-            } catch (Exception e) {
-                log.warn("Fallo la llamada a Gemini LLM, recurriendo a motor local: {}", e.getMessage());
             }
         }
 
@@ -171,27 +175,112 @@ public class AICommandParser {
     /**
      * Transcribe un audio codificado en Base64 utilizando Groq Whisper (whisper-large-v3-turbo).
      */
+    /**
+     * Transcribe un audio codificado en Base64 utilizando Groq Whisper como primario
+     * y Google Gemini Audio como respaldo automático.
+     */
     public String transcribeAudioBase64(String audioBase64) {
-        if (audioBase64 == null || audioBase64.isBlank() || !aiConfig.hasGroq()) {
+        if (audioBase64 == null || audioBase64.isBlank()) {
             return null;
         }
 
-        try {
-            String cleanBase64 = audioBase64;
-            String extension = "webm";
-            if (cleanBase64.contains(",")) {
-                String header = cleanBase64.substring(0, cleanBase64.indexOf(","));
-                if (header.contains("wav")) extension = "wav";
-                else if (header.contains("mp3")) extension = "mp3";
-                else if (header.contains("ogg")) extension = "ogg";
-                cleanBase64 = cleanBase64.substring(cleanBase64.indexOf(",") + 1);
+        String cleanBase64 = audioBase64;
+        String extension = "webm";
+        String mimeType = "audio/webm";
+        if (cleanBase64.contains(",")) {
+            String header = cleanBase64.substring(0, cleanBase64.indexOf(","));
+            if (header.contains("wav")) { extension = "wav"; mimeType = "audio/wav"; }
+            else if (header.contains("mp3")) { extension = "mp3"; mimeType = "audio/mp3"; }
+            else if (header.contains("ogg")) { extension = "ogg"; mimeType = "audio/ogg"; }
+            cleanBase64 = cleanBase64.substring(cleanBase64.indexOf(",") + 1);
+        }
+
+        // 1. Motor Primario: Groq Whisper (whisper-large-v3-turbo)
+        if (aiConfig.hasGroq()) {
+            try {
+                byte[] audioBytes = Base64.getDecoder().decode(cleanBase64.trim());
+                String groqResult = transcribeAudio(audioBytes, "voice_input." + extension);
+                if (groqResult != null && !groqResult.isBlank()) {
+                    return groqResult;
+                }
+                log.warn("Groq Whisper no devolvió transcripción, activando fallback a Google Gemini Audio...");
+            } catch (Exception e) {
+                log.warn("Fallo transcripción con Groq Whisper, activando fallback a Google Gemini Audio: {}", e.getMessage());
             }
-            byte[] audioBytes = Base64.getDecoder().decode(cleanBase64.trim());
-            return transcribeAudio(audioBytes, "voice_input." + extension);
-        } catch (Exception e) {
-            log.error("Error al decodificar audioBase64 para transcripción: {}", e.getMessage());
+        }
+
+        // 2. Motor Secundario / Fallback: Google Gemini Multimodal Audio
+        if (aiConfig.hasGemini()) {
+            try {
+                String geminiResult = transcribeAudioWithGemini(cleanBase64.trim(), mimeType);
+                if (geminiResult != null && !geminiResult.isBlank()) {
+                    return geminiResult;
+                }
+            } catch (Exception e) {
+                log.warn("Fallo la transcripción con Google Gemini Audio: {}", e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Transcribe audio mediante Google Gemini como respaldo ante fallos de Groq.
+     */
+    private String transcribeAudioWithGemini(String base64Audio, String mimeType) {
+        if (base64Audio == null || base64Audio.isBlank() || !aiConfig.hasGemini()) {
             return null;
         }
+
+        Map<String, Object> audioPart = Map.of(
+                "inline_data", Map.of(
+                        "mime_type", (mimeType != null && !mimeType.isBlank()) ? mimeType : "audio/webm",
+                        "data", base64Audio
+                )
+        );
+        Map<String, Object> textPart = Map.of(
+                "text", "Transcribe textualmente y con exactitud lo que se dice en este audio en español. Devuelve ÚNICAMENTE el texto transcrito sin comillas, sin explicaciones ni introducciones. Si no se percibe voz humana comprensible, responde únicamente 'sin audio'."
+        );
+        Map<String, Object> contentObj = Map.of("parts", List.of(audioPart, textPart));
+        Map<String, Object> requestBody = Map.of(
+                "contents", List.of(contentObj),
+                "generationConfig", Map.of("temperature", 0.0)
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        List<String> models = new ArrayList<>();
+        if (aiConfig.getGeminiModel() != null && !aiConfig.getGeminiModel().isBlank()) {
+            models.add(aiConfig.getGeminiModel().trim());
+        }
+        for (String m : List.of("gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.5-flash")) {
+            if (!models.contains(m)) {
+                models.add(m);
+            }
+        }
+
+        for (String model : models) {
+            try {
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + aiConfig.getGeminiApiKey().trim();
+                ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    JsonNode root = objectMapper.readTree(response.getBody());
+                    JsonNode candidates = root.path("candidates");
+                    if (candidates.isArray() && !candidates.isEmpty()) {
+                        String text = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
+                        if (text != null && !text.isBlank() && !text.equalsIgnoreCase("sin audio")) {
+                            log.info("Audio transcrito exitosamente con API secundaria Google Gemini ({}): '{}'", model, text.trim());
+                            return text.trim();
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Fallo en modelo Gemini ({}) para transcripción de audio: {}", model, e.getMessage());
+            }
+        }
+        return null;
     }
 
     /**
@@ -361,7 +450,15 @@ public class AICommandParser {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-        List<String> models = List.of("gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash");
+        List<String> models = new ArrayList<>();
+        if (aiConfig.getGeminiModel() != null && !aiConfig.getGeminiModel().isBlank()) {
+            models.add(aiConfig.getGeminiModel().trim());
+        }
+        for (String m : List.of("gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash")) {
+            if (!models.contains(m)) {
+                models.add(m);
+            }
+        }
         for (String model : models) {
             String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + aiConfig.getGeminiApiKey().trim();
             try {
